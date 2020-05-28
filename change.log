@@ -1,0 +1,26 @@
+22.April 2020
+=============
+Extended the selection of logfiles to define the evaluation time window by
+ - using wildcard characters "*" and "?" to match several logfiles like AndroidAPS._2020-04-02* for a whole day
+ - define a start time for the emulation in UTC format like "2020-04-02T10:00:00Z" for noon MESZ time zone
+ - define an end time for the emulation in UTC firmat like "2020-04-02T12", i.e. ending at 14:00 in MESZ time zone
+Added more values to list or plot, namely
+ - IOB, COB, autosense ratio, insulin activity
+Added graphic output for
+ - predictions as shown on the AAPS home screen
+ - flowchart of how the decisons in determine-basal are transversed at each time step
+Debugged one error in determine-basal.py
+
+
+31.March 2020
+=============
+Adapted for AAPS verison 2.6.1
+Debugged / added DLST handling for summer 2019 through to summer 2020 in ME(S)Z time zone
+
+
+
+08.March 2020
+=============
+Changes Related to variant definition improve checking the success of variant definition process:
+ - debugged reporting of new, additional parameters
+ - added reporting of ignored instructions
