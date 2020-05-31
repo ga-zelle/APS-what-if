@@ -1,3 +1,16 @@
+31.May 2020
+===========
+Major addition
+ - GUI front end to collect inputs and guide users who are less IT literate
+ - STAIR to define basal like time dependent variations
+ - INTERPOL to define inter- and extrapolation in time dependent variations
+Minor addition
+ - logfiles may also be left in original zip format
+Removed bugs
+ - one error in determine_basal.py
+ - one reporting error in assigning the variations
+
+
 22.April 2020
 =============
 Extended the selection of logfiles to define the evaluation time window by
@@ -9,7 +22,7 @@ Added more values to list or plot, namely
 Added graphic output for
  - predictions as shown on the AAPS home screen
  - flowchart of how the decisons in determine-basal are transversed at each time step
-Debugged one error in determine-basal.py
+Debugged one error in determine_basal.py
 
 
 31.March 2020
