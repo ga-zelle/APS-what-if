@@ -866,7 +866,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     #// if UAM is disabled, average IOB and COB
     elif ( minCOBPredBG < 999 ) :
         avgPredBG = round( (IOBpredBG + COBpredBG)/2 )
-        Flows.append(dict(title=str(avgPredBG)+"; weighted avg of\nIOBpredBG("+str(round(IOBpredBG))+")\nCOBpredBG("+str(round(COBpredBG))+")\nUAM disabled(", indent='+1', adr='688'))
+        Flows.append(dict(title=str(avgPredBG)+"; avg of\nIOBpredBG("+str(round(IOBpredBG))+")\nCOBpredBG("+str(round(COBpredBG))+")\nUAM disabled", indent='+1', adr='688'))
     #// if we have UAM but no COB, average IOB and UAM
     elif ( minUAMPredBG < 999 ) :
         avgPredBG = round( (IOBpredBG + UAMpredBG)/2 )
@@ -1272,7 +1272,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         Flows.append(dict(title="not SMB allowed\nand no COB\neventualBG("+str(eventualBG)+")   \n   >= max_bg("+str(convert_bg(max_bg, profile))+")", indent='0', adr='1000+1'))
     if (iob_data['iob'] > max_iob) :
         rT['reason'] += "IOB " + str(round(iob_data['iob'],2)) + " > max_iob " + str(max_iob)
-        Flows.append(dict(title="IOB(" + str(round(iob_data['iob'],2)) + ") > max_iob(" + str(max_iob)+")\ninsulinReq="+str(insulinReq), indent='0', adr='1003+1'))
+        Flows.append(dict(title="IOB(" + str(round(iob_data['iob'],2)) + ") > max_iob(" + str(max_iob)+")", indent='0', adr='1003+1'))
         if (currenttemp['duration'] > 15 and (round_basal(basal, profile) == round_basal(currenttemp['rate'], profile))) :
             rT['reason'] += ", temp " + str(currenttemp['rate']) + " ~ req " + str(basal) + "U/hr. "
             Flows.append(dict(title="R E T U R N\nset rate="+str(currenttemp['rate'])+"\durationn="+str(basal), indent='+0', adr='1006+1'))
