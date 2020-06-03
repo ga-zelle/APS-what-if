@@ -1075,7 +1075,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         Fcasts['Levels']['SMBoff'] = 'minGuard('+str(minGuardBG)+') <   \n   threshold('+str(threshold)+')'
         Fcasts['Levels']['type'] = 'threshold'
         Fcasts['Levels']['value'] = threshold
-        Levels['minGuardBG1'] = minGuardBG1
+        Fcasts['Levels']['minGuardBG1'] = minGuardBG1
         Fcasts['Levels']['source'] = minGuardSource
         Fcasts['Levels']['timePos'] = minGuardPos
         if minGuardSource2 != '':                   # blend of COB and UAM
@@ -1093,7 +1093,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         Fcasts['Levels']['SMBoff'] = 'maxDelta('+str(maxDelta)+') >   \n   '+str(100*new_parameter['maxDeltaRatio'])+'% of bg('+str(bg)+')'
         Fcasts['Levels']['type'] = 'maxDelta'
         Fcasts['Levels']['value'] = ( 1 - new_parameter['maxDeltaRatio'] ) * bg
-        Fcasts['Levels']['minGuardBG'] = bg
+        Fcasts['Levels']['minGuardBG1'] = bg
         Fcasts['Levels']['source'] = 'bg'
         Fcasts['Levels']['timePos'] = 0
 
