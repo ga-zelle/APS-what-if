@@ -16,4 +16,15 @@ Related data like SGV, target, Autosens ratio etc. are also shown.
 
 A special output is the flowchart which helps to understand the logic flow through the loop. This is the 
 track which statements in "determineSB-basal" were executed and which not together with the reasoning 
-of those decisionslisted in the original code.
+of those decisions listed in the original code.
+
+# This prototype of autoISF is still experimental. 
+Here, insulin resistance if defined as glucose not changing for at least 10 minutes, 
+being above target and no carbs present. In such a case the ISF is strengthened, the 
+longer and higher the resistance the stronger.
+
+The python scripts in the master branch were extended to handle this. With this emulation I scaled the 
+size of the effect against historical situations. Also, I extended the python scripts further so they 
+run on same phone where APS runs. Here I use the current logfile which allows shadowing APS immediatley 
+and see what would be different if autoISF was activated. After this final scaling phase it looked so 
+good that I inserted first bits in APS.
