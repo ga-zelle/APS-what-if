@@ -244,6 +244,7 @@ def clearchecks():
     useiob.set('off')
     useactivity.set('off')
     useas_ratio.set('off')
+    useISF.set('off')
     if raw.get() == 'most':
         usepred.set('on')
         useflow.set('on')
@@ -263,6 +264,7 @@ def optionLabels(show):
     chkiob['text']      = show + ' IOB'
     chkactivity['text'] = show + ' insulin activity'
     chkas_ratio['text'] = show + ' autosense ratio'
+    chkISF['text']      = show + ' ISF'
     chkpred['text']     = show + ' predictions'
     
     chkflow['text']     = show + ' flowchart'
@@ -400,11 +402,17 @@ chkas_ratio = ttk.Checkbutton(glucframe, text='Show autosense ratio', \
             command=useas_ratioChanged, variable=useas_ratio, onvalue='on', offvalue='off')
 chkas_ratio.grid(column=0, row=6, columnspan=2, sticky=(W), padx=5)
 
+def useISFChanged():   act(useISF.get(), "ISF")
+useISF = StringVar()
+chkISF = ttk.Checkbutton(glucframe, text='Show ISF', \
+            command=useISFChanged, variable=useISF, onvalue='on', offvalue='off')
+chkISF.grid(column=0, row=7, columnspan=2, sticky=(W), padx=5)
+
 def usepredChanged():       act(usepred.get(), "pred")
 usepred = StringVar()
 chkpred = ttk.Checkbutton(glucframe, text='Show predictions', \
             command=usepredChanged, variable=usepred, onvalue='on', offvalue='off')
-chkpred.grid(column=0, row=7, columnspan=2, sticky=(W), padx=5)
+chkpred.grid(column=0, row=8, columnspan=2, sticky=(W), padx=5)
 
 #   flowchart options     ------------------------------------------------------
 def useflowChanged():       act(useflow.get(), "flowchart")
