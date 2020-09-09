@@ -1,4 +1,4 @@
-# 09.September 2020
+09.September 2020
 =================
 Experimental code added to the emulator to detect insulin resistance and strengthen ISF.
 Added capability to also run the emulator on the AAPS phone. This gives two usage scenarios:
