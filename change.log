@@ -1,3 +1,12 @@
+# 09.September 2020
+=================
+Experimental code added to the emulator to detect insulin resistance and strengthen ISF.
+Added capability to also run the emulator on the AAPS phone. This gives two usage scenarios:
+ - on the PC it is as before, i.e. a time travel back to any interesting time window in the past
+ - on Android it always uses the current logfile, i.e. it shadows the active loop and suggests
+   different insulin dose which can then be applied manually in quasi open mode mode.
+
+
 31.May 2020
 ===========
 Major addition
