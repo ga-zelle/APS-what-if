@@ -266,8 +266,9 @@ def setVariant(stmp):
     new_parameter['maxBolusTargetRatio'] = 1.001       ### additional parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
     new_parameter['insulinCapBelowTarget'] = False     ### additional parameter; AAPS is fix at False; enable capping below
     new_parameter['CapFactor'] = 0                     ### additional parameter; AAPS is fix at 0; recently I used 4, but try 5
-    new_parameter['autoISF_flat'] = False               ### additional parameter; AAPS is fix at False; disable autoISF
-    new_parameter['autoISF_slope'] = False              ### additional parameter; AAPS is fix at False; disable autoISF
+    new_parameter['autoISF_flat'] = False              ### additional parameter; AAPS is fix at False; disable autoISF fpr resistance
+    new_parameter['autoISF_slope'] = False             ### additional parameter; AAPS is fix at False; disable autoISF for rise
+    new_parameter['autoISF_low'] = False               ### additional parameter; AAPS is fix at False; disable autoISF for lows
     
     ####################################################################################################################################
     STAIR = {}                                                                  # for staircase type functions like basal

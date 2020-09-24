@@ -113,8 +113,8 @@ if len(inh) > 0:
         Speaker = 'Lady'
         
     btns = ["Next", "Exit"]
-    items = ["bg", "target", 'as_ratio', "cob", "range", "slope", "ISF", "insReq", "SMB", "basal"]
-    default_pick = [0,                              4,      5,      6,      7,      8,      9]
+    items = ["bg", "target", "as_ratio", "iob", "cob", "range", "slope", "ISF", "insReq", "SMB", "basal"]
+    default_pick = [0,                                      5,      6,      7,      8,      9,      10]
     pressed_button, selected_items_indexes = mydialog("Pick outputs", btns, items, True, default_pick)
     if pressed_button != 0 or selected_items_indexes == []:
         sys.exit()    

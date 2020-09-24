@@ -171,13 +171,22 @@ def autoISF(sens, target_bg, profile, glucose_status, meal_data, autosens_data, 
     #Fcasts['origISF'] = profile['sens']                        # taken from original logfile
     #Fcasts['autoISF'] = sens                                   # as modified by autosense; taken from original logfile
     if not (new_parameter['autoISF_flat'] \
+         or new_parameter['autoISF_low']  \
          or new_parameter['autoISF_slope']):                    # keep things as in original
         Fcasts['emulISF'] = sens
         return sens
 
+    if new_parameter['autoISF_low'] and glucose_status['glucose']<target_bg:
+        weakISF = new_parameter['weakISF']
+        console_error("gz ISF weakened by factor", round(weakISF,1), "as bg is below target")
+        Flows.append(dict(title="gz ISF weakened\nby factor "+str(round(weakISF,1))+"\nbg is below target "+str(target_bg), indent='0', adr='isf179+'))
+        sens = sens * weakISF
+        Fcasts['emulISF'] = sens
+        return sens
+        
     if meal_data['mealCOB'] > 0:                                # no action while digesting carbs
         console_error("gz ISF unchanged due to presence of mealCOB "+str(meal_data['mealCOB']) )
-        Flows.append(dict(title="gz ISF unchanged\ndue to presence\nof mealCOB "+str(round(meal_data['mealCOB'],2)), indent='0', adr='isf_84+'))
+        Flows.append(dict(title="gz ISF unchanged\ndue to presence\nof mealCOB "+str(round(meal_data['mealCOB'],2)), indent='0', adr='isf_184+'))
         Fcasts['emulISF'] = sens
         return sens
     
@@ -187,7 +196,7 @@ def autoISF(sens, target_bg, profile, glucose_status, meal_data, autosens_data, 
     slope70= glucose_status['slope70']
     if avg05<target_bg :
         console_error("gz keep ISF as glucose is below target")
-        Flows.append(dict(title="gz keep ISF\nglucose "+str(target_bg)+" is below target "+str(target_bg), indent='0', adr='isf_93+'))
+        Flows.append(dict(title="gz keep ISF\nglucose "+str(target_bg)+" is below target "+str(target_bg), indent='0', adr='isf_194+'))
         Fcasts['emulISF'] = sens
         return sens
         
@@ -385,7 +394,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     if (glucose_status['delta'] > -0.5):
         tick = "+" + str(round(glucose_status['delta'],0))
     else:
-        tick = round(glucose_status['delta'],0)
+        tick =       str(round(glucose_status['delta'],0))  # for python: make sure it is always string type
 
     #//minDelta = Math.min(glucose_status.delta, glucose_status.short_avgdelta, glucose_status.long_avgdelta);
     minDelta = min(glucose_status['delta'], glucose_status['short_avgdelta'])
@@ -1218,7 +1227,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         return                    setTempBasal(0, durationReq, profile, rT, currenttemp, Flows)
 
     if (eventualBG < min_bg) :      #// if eventual BG is below target:
-        Flows.append(dict(title="eventualBG("+str(eventualBG)+")\n< min_bg("+str(min_bg)+")\nwhat now?", indent='0', adr='884+1'))
+        Flows.append(dict(title="eventualBG("+str(eventualBG)+")\n< min_bg("+str(min_bg)+")", indent='0', adr='884+1'))
         rT['reason'] += "Eventual BG " + str(convert_bg(eventualBG, profile)) + " < " + str(convert_bg(min_bg, profile))
         #// if 5m or 30m avg BG is rising faster than expected delta
         if ( minDelta > expectedDelta and minDelta > 0 and not carbsReq ) :
@@ -1230,10 +1239,12 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 #eturn tempBasalFunctions.setTempBasal(0, 30, profile, rT, currenttemp)
                 return                    setTempBasal(0, 30, profile, rT, currenttemp, Flows)
             if (glucose_status['delta'] > minDelta) :
-                rT['reason'] += ", but Delta " + str(convert_bg(tick, profile)) + " > expectedDelta " + str(convert_bg(expectedDelta, profile))
+                rT['reason'] += ", but Delta " + tick + " > expectedDelta " + str(convert_bg(expectedDelta, profile))
+                Flows.append(dict(title="but Delta " + tick + " > expectedDelta " + str(convert_bg(expectedDelta, profile)), indent='+1', adr='891+1'))
             else :
                 #rT['reason'] += ", but Min. Delta " + str(minDelta.toFixed(2)) + " > Exp. Delta " + str(convert_bg(expectedDelta, profile))
                 rT['reason'] += ", but Min. Delta " + str(round(minDelta,2)) + " > Exp. Delta " + str(convert_bg(expectedDelta, profile))
+                Flows.append(dict(title="but Min. Delta " + str(round(minDelta,2)) + " > Exp. Delta " + str(convert_bg(expectedDelta, profile)), indent='+1', adr='894+1'))
             if (currenttemp['duration'] > 15 and (round_basal(basal, profile) == round_basal(currenttemp['rate'], profile))) :
                 rT['reason'] += ", temp " + str(currenttemp['rate']) + " ~ req " + str(basal) + "U/hr. "
                 Flows.append(dict(title="temp " + str(currenttemp['rate']) + " ~ req " + str(basal) + "U/hr", indent='+1', adr='898+1'))
@@ -1318,7 +1329,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             Flows.append(dict(title="not in\nSMB mode", indent='+1', adr='967+1'))
             if (glucose_status['delta'] < minDelta) :
                 rT['reason'] += "Eventual BG " + str(convert_bg(eventualBG, profile)) + " > " + str(convert_bg(min_bg, profile)) + " but Delta " + str(convert_bg(tick, profile)) + " < Exp. Delta " + str(convert_bg(expectedDelta, profile))
-                Flows.append(dict(title="Eventual BG(" + str(convert_bg(eventualBG, profile)) + ")   \n   > min_bg(" + str(convert_bg(min_bg, profile)) + ")\nbut\nDelta(" + str(convert_bg(tick, profile)) + ") < Exp. Delta[" + str(convert_bg(expectedDelta, profile))+')', indent='+1', adr='968+1'))
+                Flows.append(dict(title="Eventual BG(" + str(convert_bg(eventualBG, profile)) + ")   \n   > min_bg(" + str(convert_bg(min_bg, profile)) + ")\nbut\nDelta(" + tick + ") < Exp. Delta[" + str(convert_bg(expectedDelta, profile))+')', indent='+1', adr='968+1'))
             else :
                 rT['reason'] += "Eventual BG " + str(convert_bg(eventualBG, profile)) + " > " + str(convert_bg(min_bg, profile)) + " but Min. Delta " + str(round(minDelta,2) )+ " < Exp. Delta " + str(convert_bg(expectedDelta, profile))
                 Flows.append(dict(title="Eventual BG(" + str(convert_bg(eventualBG, profile)) + ") > min_bg(" + str(convert_bg(min_bg, profile)) + ")\nbut\nMin. Delta(" + str(round(minDelta,2) )+ ") < Exp. Delta(" + str(convert_bg(expectedDelta, profile))+')', indent='+1', adr='970+1'))
@@ -1333,7 +1344,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 return                    setTempBasal(basal, 30, profile, rT, currenttemp, Flows)
     #// eventualBG or minPredBG is below max_bg
     if (min(eventualBG,minPredBG) < max_bg) :
-        Flows.append(dict(title="eventualBG("+str(eventualBG)+")   \n   or minPredBG("+str(minPredBG)+")\nis below max_bg("+str(max_bg)+")\nwhat now?", indent='0', adr='983+1'))
+        Flows.append(dict(title="eventualBG("+str(eventualBG)+")   \n   or minPredBG("+str(minPredBG)+")\nis below max_bg("+str(max_bg)+")", indent='0', adr='983+1'))
         #// if in SMB mode, don't cancel SMB zero temp
         if (not (microBolusAllowed and enableSMB )) :
             Flows.append(dict(title="not in SMB mode\neventualBG("+str(convert_bg(eventualBG, profile))+")-minPredBG("+str(convert_bg(minPredBG, profile))+")\nin range: no temp required", indent='+1', adr='985+1'))
