@@ -8,7 +8,8 @@ Added more values to list or plot, namely
  - support autoISF by listing and plotting the autoISF factor
 Removed bugs
  - in GUI mode the result files are now written to correct folder
-
+ - European daylight savings time added for summer 2021
+ 
 
 
 18.Nov.2020
