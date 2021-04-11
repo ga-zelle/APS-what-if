@@ -288,138 +288,146 @@ def setVariant(stmp):
     # read the variations and apply them
     fnam= varLabel + '.dat'
     var = open(varFile, 'r')
-    for zeile in var:
-        # get array name
-        woEndArray  = zeile.find(' ')
-        myArray     = zeile[:woEndArray]
-        zeile = zeile[woEndArray:]                                              # remaining stuff to be parsed
-        while zeile[0] == ' ':              zeile = zeile[1:]                   # truncate leading BLANKS
-        woEndItem   = zeile.find(' ')
-        myItem      = zeile[:woEndItem]
-        zeile = zeile[woEndItem:]                                               # remaining stuff to be parsed
-        while zeile[0] == ' ':              zeile = zeile[1:]                   # truncate leading BLANKS
-        woEndVal    = zeile.find('###')
-        if woEndVal<0 :                                                         # no trailing comment
-            myVal   = zeile
-        else:
-            myVal   = zeile[:woEndVal]
-        if myVal != '':
-            while myVal[-1] == ' ' :    myVal = myVal[:-1]                      # truncate trailing BLANKS
-        #print('['+myArray+'], ['+myItem+'], ['+myVal+']')
-       
-        woSTAIR = myVal.find('STAIR')
-        if woSTAIR >= 0:                                                        # get value from last valid step
-            for STEP in STAIR:
-                if STEP == stmp:
-                    newVal = STAIR[STEP]
-                    break
-                elif STEP > stmp:
-                    break
-                newVal = STAIR[STEP]
-            myVal = myVal[:woSTAIR] + str(newVal) + myVal[woSTAIR+5:]
-
-        woINTERPOL = myVal.find('INTERPOL')
-        if woINTERPOL>= 0:                                                      # get value from last valid step
-            (STEP,  sVal)  = INTERPOL[0]                                        # low end tuple
-            (STEPt, sValt) = INTERPOL[len(INTERPOL)-1]                          # high end tuple
-            if STEP > stmp:                                                     # extrapolate backwards
-                (STEPt, sValt) = INTERPOL[1]                                    # second tuple
-                lowVal = sVal
-                topVal = sValt
-                lowTime= ConvertSTRINGooDate(STEP)
-                myTime = ConvertSTRINGooDate(stmp)
-                topTime= ConvertSTRINGooDate(STEPt)
-                newVal = lowVal + (topVal-lowVal)/(topTime-lowTime)*(myTime-lowTime)
-            elif STEPt < stmp:                                                  # extrapolate forwards
-                (STEP, sVal) = INTERPOL[len(INTERPOL)-2]                        # last but 1 tuple
-                lowVal = sVal
-                topVal = sValt
-                lowTime= ConvertSTRINGooDate(STEP)
-                myTime = ConvertSTRINGooDate(stmp)
-                topTime= ConvertSTRINGooDate(STEPt)
-                newVal = lowVal + (topVal-lowVal)/(topTime-lowTime)*(myTime-lowTime)
-            else:                                                               # interpolate inside range
-                for i in range(len(INTERPOL)):
-                    (STEP, sVal) = INTERPOL[i]
+    syntax_error = False
+    for orig_zeile in var:
+        try:
+            zeile = orig_zeile
+            # get array name
+            woEndArray  = zeile.find(' ')
+            myArray     = zeile[:woEndArray]
+            zeile = zeile[woEndArray:]                                              # remaining stuff to be parsed
+            while zeile[0] == ' ':              zeile = zeile[1:]                   # truncate leading BLANKS
+            woEndItem   = zeile.find(' ')
+            myItem      = zeile[:woEndItem]
+            zeile = zeile[woEndItem:]                                               # remaining stuff to be parsed
+            while zeile[0] == ' ':              zeile = zeile[1:]                   # truncate leading BLANKS
+            woEndVal    = zeile.find('###')
+            if woEndVal<0 :                                                         # no trailing comment
+                myVal   = zeile
+            else:
+                myVal   = zeile[:woEndVal]
+            if myVal != '':
+                while myVal[-1] == ' ' :    myVal = myVal[:-1]                      # truncate trailing BLANKS
+            #print('['+myArray+'], ['+myItem+'], ['+myVal+']')
+           
+            woSTAIR = myVal.find('STAIR')
+            if woSTAIR >= 0:                                                        # get value from last valid step
+                for STEP in STAIR:
                     if STEP == stmp:
-                        newVal = INTERPOL[STEP]
+                        newVal = STAIR[STEP]
                         break
                     elif STEP > stmp:
-                        topVal = sVal
-                        lowTime= ConvertSTRINGooDate(lowLabl)
-                        myTime = ConvertSTRINGooDate(stmp)
-                        topTime= ConvertSTRINGooDate(STEP)
-                        newVal = lowVal + (topVal-lowVal)/(topTime-lowTime)*(myTime-lowTime)
                         break
-                    lowVal = sVal 
-                    lowLabl= STEP
-            myVal = myVal[:woINTERPOL] + str(newVal) + myVal[woINTERPOL+8:]
+                    newVal = STAIR[STEP]
+                myVal = myVal[:woSTAIR] + str(newVal) + myVal[woSTAIR+5:]
 
-        logmsg = 'appended new entry to'
-        validRow = True
-        if   myArray == 'autosens_data' :
-            if myItem in autosens_data :
-                logmsg = 'edited old value of '+str(autosens_data[myItem])+' in'
-            autosens_data[myItem] = eval(myVal)
-            logres = str(autosens_data[myItem])
-        elif myArray == 'glucose_status' :
-            if myItem in glucose_status :
-                logmsg = 'edited old value of '+str(glucose_status[myItem])+' in'
-            glucose_status[myItem] = eval(myVal)
-            logres = str(glucose_status[myItem])
-        elif myArray == 'currenttemp' :
-            if myItem in currenttemp :
-                logmsg = 'edited old value of '+str(currenttemp[myItem])+' in'
-            currenttemp[myItem] = eval(myVal)
-            logres = str(currenttemp[myItem])
-        elif myArray == 'iob_data' :
-            if myItem in iob_data :
-                logmsg = 'edited old value of '+str(iob_data[myItem])+' in'
-            iob_data[myItem] = eval(myVal)
-            logres = str(iob_data[myItem])
-        elif myArray == 'meal_data' :
-            if myItem in meal_data :
-                logmsg = 'edited old value of '+str(meal_data[myItem])+' in'
-            meal_data[myItem] = eval(myVal)
-            logres = str(meal_data[myItem])
-        elif myArray == 'profile' :
-            if myItem in profile :
-                logmsg = 'edited old value of '+str(profile[myItem])+' in'
-            profile[myItem] = eval(myVal)
-            logres = str(profile[myItem])
-        elif myArray == 'temp' :
-            if myItem in temp :
-                logmsg = 'edited old value of '+str(temp[myItem])+' in'
-            temp[myItem] = eval(myVal)
-            logres = str(temp[myItem])
-        elif myArray == 'STAIR' :
-            STAIR[myItem] = eval(myVal)
-            logres = myVal
-        elif myArray == 'new_parameter' :                                       # allow also string type assignments like "<V2.7"
-            if myItem in new_parameter :
-                logmsg = 'edited old value of '+str(new_parameter[myItem])+' in'
-            if myVal[0] == '"' :
-                new_parameter[myItem] =      myVal[1:-1]                        # string variable
+            woINTERPOL = myVal.find('INTERPOL')
+            if woINTERPOL>= 0:                                                      # get value from last valid step
+                (STEP,  sVal)  = INTERPOL[0]                                        # low end tuple
+                (STEPt, sValt) = INTERPOL[len(INTERPOL)-1]                          # high end tuple
+                if STEP > stmp:                                                     # extrapolate backwards
+                    (STEPt, sValt) = INTERPOL[1]                                    # second tuple
+                    lowVal = sVal
+                    topVal = sValt
+                    lowTime= ConvertSTRINGooDate(STEP)
+                    myTime = ConvertSTRINGooDate(stmp)
+                    topTime= ConvertSTRINGooDate(STEPt)
+                    newVal = lowVal + (topVal-lowVal)/(topTime-lowTime)*(myTime-lowTime)
+                elif STEPt < stmp:                                                  # extrapolate forwards
+                    (STEP, sVal) = INTERPOL[len(INTERPOL)-2]                        # last but 1 tuple
+                    lowVal = sVal
+                    topVal = sValt
+                    lowTime= ConvertSTRINGooDate(STEP)
+                    myTime = ConvertSTRINGooDate(stmp)
+                    topTime= ConvertSTRINGooDate(STEPt)
+                    newVal = lowVal + (topVal-lowVal)/(topTime-lowTime)*(myTime-lowTime)
+                else:                                                               # interpolate inside range
+                    for i in range(len(INTERPOL)):
+                        (STEP, sVal) = INTERPOL[i]
+                        if STEP == stmp:
+                            newVal = INTERPOL[STEP]
+                            break
+                        elif STEP > stmp:
+                            topVal = sVal
+                            lowTime= ConvertSTRINGooDate(lowLabl)
+                            myTime = ConvertSTRINGooDate(stmp)
+                            topTime= ConvertSTRINGooDate(STEP)
+                            newVal = lowVal + (topVal-lowVal)/(topTime-lowTime)*(myTime-lowTime)
+                            break
+                        lowVal = sVal 
+                        lowLabl= STEP
+                myVal = myVal[:woINTERPOL] + str(newVal) + myVal[woINTERPOL+8:]
+
+            logmsg = 'appended new entry to'
+            validRow = True
+            if   myArray == 'autosens_data' :
+                if myItem in autosens_data :
+                    logmsg = 'edited old value of '+str(autosens_data[myItem])+' in'
+                autosens_data[myItem] = eval(myVal)
+                logres = str(autosens_data[myItem])
+            elif myArray == 'glucose_status' :
+                if myItem in glucose_status :
+                    logmsg = 'edited old value of '+str(glucose_status[myItem])+' in'
+                glucose_status[myItem] = eval(myVal)
+                logres = str(glucose_status[myItem])
+            elif myArray == 'currenttemp' :
+                if myItem in currenttemp :
+                    logmsg = 'edited old value of '+str(currenttemp[myItem])+' in'
+                currenttemp[myItem] = eval(myVal)
+                logres = str(currenttemp[myItem])
+            elif myArray == 'iob_data' :
+                if myItem in iob_data :
+                    logmsg = 'edited old value of '+str(iob_data[myItem])+' in'
+                iob_data[myItem] = eval(myVal)
+                logres = str(iob_data[myItem])
+            elif myArray == 'meal_data' :
+                if myItem in meal_data :
+                    logmsg = 'edited old value of '+str(meal_data[myItem])+' in'
+                meal_data[myItem] = eval(myVal)
+                logres = str(meal_data[myItem])
+            elif myArray == 'profile' :
+                if myItem in profile :
+                    logmsg = 'edited old value of '+str(profile[myItem])+' in'
+                profile[myItem] = eval(myVal)
+                logres = str(profile[myItem])
+            elif myArray == 'temp' :
+                if myItem in temp :
+                    logmsg = 'edited old value of '+str(temp[myItem])+' in'
+                temp[myItem] = eval(myVal)
+                logres = str(temp[myItem])
+            elif myArray == 'STAIR' :
+                STAIR[myItem] = eval(myVal)
+                logres = myVal
+            elif myArray == 'new_parameter' :                                       # allow also string type assignments like "<V2.7"
+                if myItem in new_parameter :
+                    logmsg = 'edited old value of '+str(new_parameter[myItem])+' in'
+                if myVal[0] == '"' :
+                    new_parameter[myItem] =      myVal[1:-1]                        # string variable
+                else:
+                    new_parameter[myItem] = eval(myVal)                             # normal case of numeric or booolean variable
+                logres = str(new_parameter[myItem])
+            elif myArray == 'STAIR' :
+                STAIR[myItem] = eval(myVal)
+            elif myArray == 'INTERPOL' :
+                if len(myItem) < 24:                                                # incomplete UTC time label
+                    oldLen = len(myItem)
+                    if myItem[oldLen-1:] == 'Z':
+                        oldLen += -1
+                        myItem = myItem[:-1]
+                    myItem = myItem + '00:00:00.000Z'[oldLen-11:]
+                INTERPOL.append((myItem, eval(myVal)) )
+                logres = myVal
             else:
-                new_parameter[myItem] = eval(myVal)                             # normal case of numeric or booolean variable
-            logres = str(new_parameter[myItem])
-        elif myArray == 'STAIR' :
-            STAIR[myItem] = eval(myVal)
-        elif myArray == 'INTERPOL' :
-            if len(myItem) < 24:                                                # incomplete UTC time label
-                oldLen = len(myItem)
-                if myItem[oldLen-1:] == 'Z':
-                    oldLen += -1
-                    myItem = myItem[:-1]
-                myItem = myItem + '00:00:00.000Z'[oldLen-11:]
-            INTERPOL.append((myItem, eval(myVal)) )
-            logres = myVal
-        else:
-            validRow = False
-    
-        if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
-        else:           varlog.write('not actioned: ['+myArray+'], ['+myItem+'], ['+myVal+']'+'\n')
+                validRow = False
         
+            if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
+            else:           varlog.write('not actioned: ['+myArray+'], ['+myItem+'], ['+myVal+']'+'\n')
+        except: # catch *all* exceptions
+            e = sys.exc_info()[0]
+            varlog.write("*******\nProblem in VDF-file in row reading\n"+orig_zeile+"\nerror message is:"+str(e)+"\n*******\n")
+            sub_issue('error found while processing VDF file. For details, see file "*.'+varLabel+'.log"')
+            syntax_error = True
+                    
     ####################################################################################################################################
     # final clean up
     #ew_parameter['AAPS_Version'] = AAPS_Version                ### flag to handle differences in determine-basal
@@ -431,6 +439,7 @@ def setVariant(stmp):
     emulTarHig[-1] = profile['max_bg']                          ### please do not touch
     global emulAs_ratio
     emulAs_ratio.append(autosens_data['ratio']*10)
+    return syntax_error
 
 def getOrigPred(predBGs):
     Fcasts = {}
@@ -564,7 +573,7 @@ def TreatLoop(Curly, log, lcount):
         #print('row', str(lcount), 'deltas', str(len(longDelta)), str(longDelta), '\nslopes', str(len(longSlope)), str(longSlope))
         #Fcasts = getOrigPred(suggest['predBGs'])
         Flows  = []
-        setVariant(stmp)
+        if setVariant(stmp):        return 'SYNTAX'     # syntax problem in VDF file
         
         #if profile['new_parameter']['bestParabola']:       dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
         
@@ -916,7 +925,7 @@ def scanLogfile(fn, entries):
                         #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
                         if Curly.find('{"device":"openaps:')==0:   
                             cont = TreatLoop(Curly, log, lcount)
-                            if cont == 'STOP' :     return cont
+                            if cont=='STOP' or cont=='SYNTAX':     return cont
                 elif zeile.find('data:{"device":"openaps:') == 0 :          ################## flag for V2.6.1
                     Curly =  hole(zeile, 5, '{', '}')
                     #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
@@ -924,7 +933,7 @@ def scanLogfile(fn, entries):
                     and Curly.find('"openaps":{"suggested":{')>0 :
                         #and 'lastTempAge' in SMBreason :   
                         cont = TreatLoop(Curly, log, lcount)
-                        if cont == 'STOP' :     return cont
+                        if cont=='STOP' or cont=='SYNTAX':     return cont
 
         except UnicodeDecodeError:              # needed because "for zeile in lf" does not work with AAPS 2.5 containing non-printing ASCII codes
             lcount +=  1                        # skip this line, it contains non-ASCII characters!
@@ -1649,6 +1658,7 @@ def XYplots(loopCount, head1, head2, entries) :
     pass
 
 def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries):
+    log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile)
     #   start of top level analysis
     
     global fn
@@ -1732,7 +1742,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         varLabel = varLabel[:-4]
     else:
         varFile = varFile + '.vdf'
-    
+    log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)
     logListe = glob.glob(myseek+myfile, recursive=False)
     #print ('logListe:', str(logListe))
     # ---   add sorting info    -----------------------------------
@@ -1761,6 +1771,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         
     wd = os.path.dirname(varFile)
     if isAndroid:       wd = wd + '/'
+    elif wd !='':       wd = wd + '/'           # testing GUI method
     #if wd == '':        wd = os.getcwd()
     for ps in sorted(sorted_fn):
         fn = sorted_fn[ps]
@@ -1775,6 +1786,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
             if filecount == 0 :                     # initalize file loop
                 #wd = os.path.dirname(varFile)
                 fnLabel = os.path.basename(fn)
+                log_msg('inside all_parameters_known, file loop -->\nwd='+wd+'\nfnLabel='+fnLabel)
                 ce_file = wd + fnLabel + '.' + varLabel + '.txt'
                 cel = open(ce_file, 'w')
                 cel.write('AAPS scan from ' + varLabel + ' for SMB comparison created on ' + formatdate(localtime=True) + '\n')
@@ -1787,7 +1799,8 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
             filecount += 1
-            if cont == 'STOP':      break           # end of time window reached
+            if cont == 'SYNTAX':    return 'SYNTAX', 0, '', '', 0       # problem in VDF file
+            if cont == 'STOP':      break                               # end of time window reached
     
     if filecount == 0 :
         log_msg ('no such logfile: "'+myseek+'"')
@@ -2019,3 +2032,13 @@ def log_msg(msg):                                       # for GUI
         runframe.update()                                                       # update frame display
     else:
         print(msg)
+
+def sub_issue(msg):
+    if how_to_print == 'GUI':
+        lfd['state'] = 'normal'
+        lfd.insert('end', msg + '\n', ('issue'))
+        lfd.see('end')
+    else:
+        print (msg)
+
+#

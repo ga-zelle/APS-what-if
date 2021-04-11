@@ -245,7 +245,7 @@ lastTime = '0'
 while wdhl[0]=='y':                                                                 # use CANCEL to stop/exit
     # All command line arguments known, go for main process
     thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries)
-
+    if thisTime == 'SYNTAX':        break                                           # problem in VDF file
     #print('returned vary_ISF_batch:', CarbReqGram, ' minutes:',  CarbReqTime)
     if IsAndroid:
         thisHour = datetime.now()

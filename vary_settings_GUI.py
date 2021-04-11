@@ -12,7 +12,7 @@ from tkinter import messagebox
 
 from vary_settings_core import parameters_known
 from vary_settings_core import set_tty
-from vary_settings_core import log_msg
+from vary_settings_core import log_msg, sub_issue
 
 
 #################################################################################
@@ -247,6 +247,7 @@ def clearchecks():
     useai_ratio.set('off')
     userange.set('off')
     useslope.set('off')
+    useparabola.set('off')
     useISF.set('off')
     if raw.get() == 'most':
         usepred.set('on')
@@ -270,6 +271,7 @@ def optionLabels(show):
     chkai_ratio['text'] = show + ' autoISF ratio'
     chkrange['text']    = show + ' range parameters'
     chkslope['text']    = show + ' slope parameters'
+    chkparabola['text'] = show + ' parabola'
     chkISF['text']      = show + ' ISF'
     chkpred['text']     = show + ' predictions'
     
@@ -346,7 +348,7 @@ insuframe = ttk.Labelframe(outframe, width=250, height=400, text='Insulin chart 
 insuframe.grid(row= 20, column=1, padx=20, pady=5, sticky=(W,N))
 glucframe = ttk.Labelframe(outframe, width=250, height=400, text='Glucose chart content          ') # same width as autoISF frame
 glucframe.grid(row= 20, column=2, padx=20, pady=5, sticky=(W,N))
-isf_frame = ttk.Labelframe(outframe, width=250, height=400, text='specials for autoISF content')
+isf_frame = ttk.Labelframe(outframe, width=250, height=400, text='specials, e.g. autoISF')
 isf_frame.grid(row= 30, column=2, padx=20, pady=5, sticky=(W,N))
 flowframe = ttk.Labelframe(outframe, width=250, height=400, text='Flowchart ON/OFF')
 flowframe.grid(row= 20, column=3, padx=20, pady=5, sticky=(W,N))
@@ -438,11 +440,17 @@ chkslope = ttk.Checkbutton(isf_frame, text='Show slope', \
             command=useslopeChanged, variable=useslope, onvalue='on', offvalue='off')
 chkslope.grid(column=0, row=9, columnspan=2, sticky=(W), padx=5)
 
+def useparabolaChanged():   act(useparabola.get(), "bestParabola/fitsParabola")
+useparabola = StringVar()
+chkparabola = ttk.Checkbutton(isf_frame, text='Show parabolas', \
+            command=useparabolaChanged, variable=useparabola, onvalue='on', offvalue='off')
+chkparabola.grid(column=0, row=10, columnspan=2, sticky=(W), padx=5)
+
 def useISFChanged():   act(useISF.get(), "ISF")
 useISF = StringVar()
 chkISF = ttk.Checkbutton(isf_frame, text='Show ISF', \
             command=useISFChanged, variable=useISF, onvalue='on', offvalue='off')
-chkISF.grid(column=0, row=10, columnspan=2, sticky=(W), padx=5)
+chkISF.grid(column=0, row=11, columnspan=2, sticky=(W), padx=5)
 
 #   flowchart options     ------------------------------------------------------
 def useflowChanged():       act(useflow.get(), "flowchart")
@@ -615,14 +623,6 @@ def clear_msg():
     lfd.delete(1.0, 'end')
     lfd['state'] = 'disabled'
     
-def sub_issue(msg):
-    if how_to_print == 'GUI':
-        lfd['state'] = 'normal'
-        lfd.insert('end', msg + '\n', ('issue'))
-    else:
-        print (msg)
-    lfd.see('end')
-
 def sub_emul():
     global runState 
     runState.set('Checking inputs ...   ')
@@ -664,9 +664,14 @@ def sub_emul():
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
-        parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries)
-        runState.set('Emulation finished ..')
-        ttk.Label(runframe, textvariable=runState, style='Done.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
+        thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries)
+        if thisTime == 'SYNTAX':
+            runState.set('Emulation halted ... ')
+            ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
+            #sub_issue('Problem in VDF file. For details, see file "*.'+variant[:-4]+'.log"')
+        else:   
+            runState.set('Emulation finished ..')
+            ttk.Label(runframe, textvariable=runState, style='Done.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
         runframe.update()                                                       # update frame display
 
         # load result filenames into resframe
@@ -676,7 +681,7 @@ def sub_emul():
         for fn in logListe:
             #log_msg("checking result file "+fn)
             ftype = fn[len(fn)-3:]
-            fn_first = wdir.get() + os.path.basename(fn)
+            fn_first = wdir.get() + '/' + os.path.basename(fn)
             varLabel = variant[:-4]
             if ftype=='zip' or ftype.find(".")>=0:
                 logfil.set(fn_first+'.'+variant[:-4]+'.log')
@@ -692,12 +697,12 @@ def sub_emul():
     except:                                                                     # catch *all* exceptions
         #e = sys.exc_info()[0]
         tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_ISF.py")
+        sub_issue("Problem in vary_settings_core.py")
         for ele in traceback.format_tb(tb):
             sub_issue(ele[:-1])                                                 # sub appends <CR>
         sub_issue(str(sys.exc_info()[1]))
         runState.set('Emulation broken ...  ')
-        ttk.Label(runframe, textvariable=runState, style='Erroor.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
+        ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
     runframe.update()                                                           # update frame display
     #log_msg("End of sub_emul reached")
     pass
