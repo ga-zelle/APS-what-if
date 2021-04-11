@@ -130,7 +130,7 @@ root.protocol("WM_DELETE_WINDOW", gui_quit)
 #   select the variant definition file  -----------------------------------------
 def get_vfil():
     oldvf = vfil.get()
-    newvf = filedialog.askopenfilename(filetypes={'Variation .dat'}, initialdir=wdir.get())
+    newvf = filedialog.askopenfilename(filetypes={'Variation {.vdf .dat}'}, initialdir=wdir.get())
     if newvf != "":
         vfil.set(newvf)
 
@@ -244,6 +244,10 @@ def clearchecks():
     useiob.set('off')
     useactivity.set('off')
     useas_ratio.set('off')
+    useai_ratio.set('off')
+    userange.set('off')
+    useslope.set('off')
+    useISF.set('off')
     if raw.get() == 'most':
         usepred.set('on')
         useflow.set('on')
@@ -263,6 +267,10 @@ def optionLabels(show):
     chkiob['text']      = show + ' IOB'
     chkactivity['text'] = show + ' insulin activity'
     chkas_ratio['text'] = show + ' autosense ratio'
+    chkai_ratio['text'] = show + ' autoISF ratio'
+    chkrange['text']    = show + ' range parameters'
+    chkslope['text']    = show + ' slope parameters'
+    chkISF['text']      = show + ' ISF'
     chkpred['text']     = show + ' predictions'
     
     chkflow['text']     = show + ' flowchart'
@@ -298,6 +306,7 @@ def radioAll():
     doit.insert('end', 'All')
     flowframe.grid_remove()
     glucframe.grid_remove()
+    isf_frame.grid_remove()
     insuframe.grid_remove()
     clearchecks()
     
@@ -308,6 +317,7 @@ def radioMost():
     clearchecks()
     insuframe.grid()
     glucframe.grid()
+    isf_frame.grid()
     flowframe.grid()
     doit.insert('end', 'All/-pred/-flowchart')
     optionLabels('Hide')
@@ -319,6 +329,7 @@ def radioSome():
     clearchecks()
     insuframe.grid()
     glucframe.grid()
+    isf_frame.grid()
     flowframe.grid()
     optionLabels('Show')
 
@@ -333,8 +344,10 @@ optHeader = StringVar()
 ttk.Label(outframe, textvariable=optHeader).grid(column=1, row=19, columnspan=3, padx=5, sticky=(W))
 insuframe = ttk.Labelframe(outframe, width=250, height=400, text='Insulin chart content')
 insuframe.grid(row= 20, column=1, padx=20, pady=5, sticky=(W,N))
-glucframe = ttk.Labelframe(outframe, width=250, height=400, text='Glucose chart content')
+glucframe = ttk.Labelframe(outframe, width=250, height=400, text='Glucose chart content          ') # same width as autoISF frame
 glucframe.grid(row= 20, column=2, padx=20, pady=5, sticky=(W,N))
+isf_frame = ttk.Labelframe(outframe, width=250, height=400, text='specials for autoISF content')
+isf_frame.grid(row= 30, column=2, padx=20, pady=5, sticky=(W,N))
 flowframe = ttk.Labelframe(outframe, width=250, height=400, text='Flowchart ON/OFF')
 flowframe.grid(row= 20, column=3, padx=20, pady=5, sticky=(W,N))
 
@@ -364,47 +377,72 @@ chkbasal = ttk.Checkbutton(insuframe, text='Show basal rate', \
 chkbasal.grid(column=0, row=4, columnspan=2, sticky=(W), padx=5)
 
 #   glucose chart options   --------------------------------------------------
+def usepredChanged():       act(usepred.get(), "pred")
+usepred = StringVar()
+chkpred = ttk.Checkbutton(glucframe, text='Show predictions', \
+            command=usepredChanged, variable=usepred, onvalue='on', offvalue='off')
+chkpred.grid(column=0, row=1, columnspan=2, sticky=(W), padx=5)
+
 def usebgChanged():         act(usebg.get(), "bg")
 usebg = StringVar()
 chkbg = ttk.Checkbutton(glucframe, text='Show glucose', \
             command=usebgChanged, variable=usebg, onvalue='on', offvalue='off')
-chkbg.grid(column=0, row=1, columnspan=2, sticky=(W), padx=5)
+chkbg.grid(column=0, row=2, columnspan=2, sticky=(W), padx=5)
 
 def usetargetChanged():     act(usetarget.get(), "target")
 usetarget = StringVar()
 chktarget = ttk.Checkbutton(glucframe, text='Show targets', \
             command=usetargetChanged, variable=usetarget, onvalue='on', offvalue='off')
-chktarget.grid(column=0, row=2, columnspan=2, sticky=(W), padx=5)
+chktarget.grid(column=0, row=3, columnspan=2, sticky=(W), padx=5)
 
 def usecobChanged():        act(usecob.get(), "cob")
 usecob = StringVar()
 chkcob = ttk.Checkbutton(glucframe, text='Show COB', \
             command=usecobChanged, variable=usecob, onvalue='on', offvalue='off')
-chkcob.grid(column=0, row=3, columnspan=2, sticky=(W), padx=5)
+chkcob.grid(column=0, row=4, columnspan=2, sticky=(W), padx=5)
 
 def useiobChanged():        act(useiob.get(), "iob")
 useiob = StringVar()
 chkiob = ttk.Checkbutton(glucframe, text='Show IOB', \
             command=useiobChanged, variable=useiob, onvalue='on', offvalue='off')
-chkiob.grid(column=0, row=4, columnspan=2, sticky=(W), padx=5)
+chkiob.grid(column=0, row=5, columnspan=2, sticky=(W), padx=5)
 
 def useactivityChanged():   act(useactivity.get(), "activity")
 useactivity = StringVar()
 chkactivity = ttk.Checkbutton(glucframe, text='Show insulin activity', \
             command=useactivityChanged, variable=useactivity, onvalue='on', offvalue='off')
-chkactivity.grid(column=0, row=5, columnspan=2, sticky=(W), padx=5)
+chkactivity.grid(column=0, row=6, columnspan=2, sticky=(W), padx=5)
 
 def useas_ratioChanged():   act(useas_ratio.get(), "as_ratio")
 useas_ratio = StringVar()
 chkas_ratio = ttk.Checkbutton(glucframe, text='Show autosense ratio', \
             command=useas_ratioChanged, variable=useas_ratio, onvalue='on', offvalue='off')
-chkas_ratio.grid(column=0, row=6, columnspan=2, sticky=(W), padx=5)
+chkas_ratio.grid(column=0, row=7, columnspan=2, sticky=(W), padx=5)
 
-def usepredChanged():       act(usepred.get(), "pred")
-usepred = StringVar()
-chkpred = ttk.Checkbutton(glucframe, text='Show predictions', \
-            command=usepredChanged, variable=usepred, onvalue='on', offvalue='off')
-chkpred.grid(column=0, row=7, columnspan=2, sticky=(W), padx=5)
+#   glucose chart, subchart autoISF options   --------------------------------------------------
+def useai_ratioChanged():   act(useai_ratio.get(), "autoISF")
+useai_ratio = StringVar()
+chkai_ratio = ttk.Checkbutton(isf_frame, text='Show autoISF ratio', \
+            command=useai_ratioChanged, variable=useai_ratio, onvalue='on', offvalue='off')
+chkai_ratio.grid(column=0, row=7, columnspan=2, sticky=(W), padx=5)
+
+def userangeChanged():   act(userange.get(), "range")
+userange = StringVar()
+chkrange = ttk.Checkbutton(isf_frame, text='Show range', \
+            command=userangeChanged, variable=userange, onvalue='on', offvalue='off')
+chkrange.grid(column=0, row=8, columnspan=2, sticky=(W), padx=5)
+
+def useslopeChanged():   act(useslope.get(), "slope")
+useslope = StringVar()
+chkslope = ttk.Checkbutton(isf_frame, text='Show slope', \
+            command=useslopeChanged, variable=useslope, onvalue='on', offvalue='off')
+chkslope.grid(column=0, row=9, columnspan=2, sticky=(W), padx=5)
+
+def useISFChanged():   act(useISF.get(), "ISF")
+useISF = StringVar()
+chkISF = ttk.Checkbutton(isf_frame, text='Show ISF', \
+            command=useISFChanged, variable=useISF, onvalue='on', offvalue='off')
+chkISF.grid(column=0, row=10, columnspan=2, sticky=(W), padx=5)
 
 #   flowchart options     ------------------------------------------------------
 def useflowChanged():       act(useflow.get(), "flowchart")
@@ -413,7 +451,7 @@ chkflow = ttk.Checkbutton(flowframe, text='Create flowchart', \
             command=useflowChanged, variable=useflow, onvalue='on', offvalue='off')
 chkflow.grid(column=0, row=1, columnspan=2, sticky=(W), padx=5)
 
-#   this is plced last because their commands refer to above defs
+#   this is placed last because their commands refer to above defs
 ttk.Label(outframe, text="\nCoarse grained selection of graphics output").grid(column=1, row=2, columnspan=3, padx=5, sticky=(W))
 raw  = StringVar()
 some = ttk.Radiobutton(outframe, variable=raw, value='some', command=radioSome, text='just a few')
@@ -583,6 +621,7 @@ def sub_issue(msg):
         lfd.insert('end', msg + '\n', ('issue'))
     else:
         print (msg)
+    lfd.see('end')
 
 def sub_emul():
     global runState 
@@ -595,8 +634,9 @@ def sub_emul():
         incomplete = True
     gopt = doit.get('1.0', 'end')[:-1]
     if gopt == '':
-        sub_issue('graphics output options is missing')
+        sub_issue('graphics output options are missing')
         incomplete = True
+    gopt = 'Windows/' + gopt                                                    # i.e. not in Android
     if afil.get() == '':
         sub_issue('AndroidAPS logfile is missing')
         incomplete = True
@@ -623,7 +663,8 @@ def sub_emul():
         runState.set('Emulation started ...')
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
-        parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp)
+        entries = {}
+        parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries)
         runState.set('Emulation finished ..')
         ttk.Label(runframe, textvariable=runState, style='Done.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
         runframe.update()                                                       # update frame display
@@ -635,12 +676,14 @@ def sub_emul():
         for fn in logListe:
             #log_msg("checking result file "+fn)
             ftype = fn[len(fn)-3:]
+            fn_first = wdir.get() + os.path.basename(fn)
+            varLabel = variant[:-4]
             if ftype=='zip' or ftype.find(".")>=0:
-                logfil.set(fn+'.'+variant[:-4]+'.log')
-                tabfil.set(fn+'.'+variant[:-4]+'.tab')
-                txtorig.set(fn+'.' + 'orig' +  '.txt')
-                txtemul.set(fn+'.'+variant[:-4]+'.txt')
-                pdffil.set(fn+'.'+variant[:-4]+'.pdf')
+                logfil.set(fn_first+'.'+variant[:-4]+'.log')
+                tabfil.set(fn_first+'.'+variant[:-4]+'.tab')
+                txtorig.set(fn_first+'.' + 'orig' +  '.txt')
+                txtemul.set(fn_first+'.'+variant[:-4]+'.txt')
+                pdffil.set(fn_first+'.'+variant[:-4]+'.pdf')
                 resframe.focus()
                 book.select(3)                                                  # activate result tab
                 logfil_entry.focus()                                            # activate as initial input box
@@ -649,7 +692,7 @@ def sub_emul():
     except:                                                                     # catch *all* exceptions
         #e = sys.exc_info()[0]
         tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_settings.py")
+        sub_issue("Problem in vary_ISF.py")
         for ele in traceback.format_tb(tb):
             sub_issue(ele[:-1])                                                 # sub appends <CR>
         sub_issue(str(sys.exc_info()[1]))
