@@ -1,14 +1,46 @@
+11.Apr.2021
+===========
+Adapted for AAPS version 2.8.2, still backward compatible down to version 2.5 
+Major addition
+ - checking user formulae in VDF-File for correct python syntax
+Added more values to list or plot, namely
+ - quadratic regression of recent BG shown in plot as parabola
+ - support autoISF by listing and plotting the autoISF factor
+Removed bugs
+ - in GUI mode the result files are now written to correct folder
+
+
+
+18.Nov.2020
+===========
+Adapted for AAPS version 2.7, still compatible with versions 2.5 and 2.6
+Major addition
+ - support autoISF for BG being consistantly too high for a longer time
+ - version selection "2.7" or "<2.7" as a what-if scenario
+ - can run on AAPS phone, too,  to give real time what-if hints like in Open Loop
+ - on AAPS phone provide spoken alarms for "add'l carbs req" or "extra bolus proposed" from what-if alternative
+Added more values to list or plot, namely
+ - ISF
+ - range for BG being unchanged
+ - linear regression of recent BG
+ - several min and max values for time window in tab-file, e.g. for autosense or SMB
+Limitation
+ - the flowchart output for version 2.7 uses outdated row number references
+
+
+
 31.May 2020
 ===========
 Major addition
  - GUI front end to collect inputs and guide users who are less IT literate
- - STAIR to define basal like time dependent variations
+ - STAIR to define time dependent variations like basal rate
  - INTERPOL to define inter- and extrapolation in time dependent variations
 Minor addition
  - logfiles may also be left in original zip format
 Removed bugs
  - one error in determine_basal.py
  - one reporting error in assigning the variations
+
 
 
 22.April 2020
@@ -22,7 +54,8 @@ Added more values to list or plot, namely
 Added graphic output for
  - predictions as shown on the AAPS home screen
  - flowchart of how the decisons in determine-basal are transversed at each time step
-Debugged one error in determine_basal.py
+Debugged one error in determine-basal.py
+
 
 
 31.March 2020
