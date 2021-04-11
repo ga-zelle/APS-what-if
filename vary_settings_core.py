@@ -796,8 +796,10 @@ def ConvertSTRINGooDate(stmp) :
          dlst =    0                                 # no dlst period winter 2019/20
     elif stmp < "2020-10-25T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2020
-    else:
+    elif stmp < "2021-03-28T02:00:00.000Z":
          dlst =    0                                 # no dlst period winter 2020/21
+    else:
+         dlst = 3600                                 #    dlst period summer 2021
     MSJahr		= eval(    stmp[ 0:4])
     MSMonat		= eval('1'+stmp[ 5:7]) -100
     MSTag		= eval('1'+stmp[ 8:10])-100
@@ -1658,7 +1660,7 @@ def XYplots(loopCount, head1, head2, entries) :
     pass
 
 def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries):
-    log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile)
+    #log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile)
     #   start of top level analysis
     
     global fn
@@ -1742,7 +1744,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         varLabel = varLabel[:-4]
     else:
         varFile = varFile + '.vdf'
-    log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)
+    #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)
     logListe = glob.glob(myseek+myfile, recursive=False)
     #print ('logListe:', str(logListe))
     # ---   add sorting info    -----------------------------------
@@ -1771,7 +1773,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         
     wd = os.path.dirname(varFile)
     if isAndroid:       wd = wd + '/'
-    elif wd !='':       wd = wd + '/'           # testing GUI method
+    elif wd !='':       wd = wd + '/'           # needed for GUI method
     #if wd == '':        wd = os.getcwd()
     for ps in sorted(sorted_fn):
         fn = sorted_fn[ps]
@@ -1786,7 +1788,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
             if filecount == 0 :                     # initalize file loop
                 #wd = os.path.dirname(varFile)
                 fnLabel = os.path.basename(fn)
-                log_msg('inside all_parameters_known, file loop -->\nwd='+wd+'\nfnLabel='+fnLabel)
+                #log_msg('inside all_parameters_known, file loop -->\nwd='+wd+'\nfnLabel='+fnLabel)
                 ce_file = wd + fnLabel + '.' + varLabel + '.txt'
                 cel = open(ce_file, 'w')
                 cel.write('AAPS scan from ' + varLabel + ' for SMB comparison created on ' + formatdate(localtime=True) + '\n')
