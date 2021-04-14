@@ -16,4 +16,4 @@ Related data like SGV, target, Autosens ratio etc. are also shown.
 
 A special output is the flowchart which helps to understand the logic flow through the loop. This is the 
 track which statements in "determineSB-basal" were executed and which not together with the reasoning 
-of those decisionslisted in the original code.
+of those decisions listed in the original code.
