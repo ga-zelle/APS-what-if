@@ -1,0 +1,6 @@
+profile     min_bg                          101                                             ### just above the temp target threshold for SMB
+profile     max_bg                          profile['min_bg']                               ### redefine target
+#rofile     target_bg                       int((profile['min_bg'] + profile['max_bg'])/2)  ### example of numerical expression
+profile     tempTargetset                   True                                            ### spelling error
+profile     temptargetSet                   True                                            ### i.e. not using NS profile target
+profile     allowSMB_with_high_temptarget   False                                           ### was True at the time
