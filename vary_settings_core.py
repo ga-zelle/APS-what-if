@@ -273,7 +273,7 @@ def setVariant(stmp):
     new_parameter['autoISF_flat'] = False              ### add'l parameter; AAPS is fix at False; disable autoISF fpr resistance
     new_parameter['autoISF_slope'] = False             ### add'l parameter; AAPS is fix at False; disable autoISF for rise
     new_parameter['autoISF_low'] = False               ### add'l parameter; AAPS is fix at False; disable autoISF for lows
-    new_parameter['CheckLibreError'] = True            ### add'l parameter: AAPS 2.7 is at True for the stupid Libre CGM error handler
+    new_parameter['CheckLibreError'] = False           ### add'l parameter: AAPS 2.7 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
     new_parameter['AAPS_Version'] = AAPS_Version       ### place it before soo it could be modified later
     new_parameter['bestParabola'] = False              ### add'l parameter; AAPS is fix at False; True for fit of quadratic curve
     new_parameter['LessSMBatModerateBG'] = False       ### additional parameter; AAPS is fix at False; reduce SMB if ...
@@ -462,7 +462,7 @@ def TreatLoop(Curly, log, lcount):
     if wo_apo>0:
         Curly = Curly[:wo_apo-1]+Curly[wo_apo:]
         #print("found \' at position "+str(wo_apo)+"\n" +Curly)
-    if not newLoop:                            # caught in the middle of a loop oor repat of Result row
+    if not newLoop:                            # caught in the middle of a loop or repat of Result row
         SMBreason = {}                                              # clear for first filtered debug list
         SMBreason['script'] = '---------- Script Debug --------------------\n'
         return 'MORE'       
@@ -480,16 +480,16 @@ def TreatLoop(Curly, log, lcount):
             return 'STOP' 
         if t_startLabel > stmp :                                    # too early
             while len(origAI_ratio)>len(loop_mills):
-                origAI_ratio.pop()                                  # erase foot print oo#f loops to be skipped
+                origAI_ratio.pop()                                  # erase foot print of loops to be skipped
             SMBreason = {}                                          # clear for first filtered debug list
             SMBreason['script'] = '---------- Script Debug --------------------\n'
             return 'MORE'       
         if t_stoppLabel < stmp :            return 'STOP'           # too late; send quit signal
         thisTime = ConvertSTRINGooDate(stmp)
+        reason = suggest['reason']
         loop_mills.append(round(thisTime/1000, 1) )                 # from millis to secs
         loop_label.append(stmp[11:19] + stmp[-1])                   # include seconds to distinguish entries
         #print('len loop_mills='+str(len(loop_mills))+'; len labels='+str(len(loop_label)))
-        reason = suggest['reason']
         if 'insulinReq' in suggest:
             key = 'insulinReq'
             ins_Req = suggest[key]
@@ -512,9 +512,18 @@ def TreatLoop(Curly, log, lcount):
         origMaxBolus.append(eval(maxBol))
         log.write('\n========== DELTA in row ' + str(lcount) + ' SMB ========== of logfile '+fn+'\n')
         log.write('  created at= ' + stmp + '\n')
-        log.write(SMBreason['script'])               # the script debug section
+        log.write(SMBreason['script'])                              # the script debug section
         #printVal(suggest, 'bg', log)
         log.write('---------- Reason --------------------------\n' + str(reason) + '\n')
+        if reason.find('Error: CGM data is unchanged for the past ~45m.')>-1:
+            # the insufficient FSL check corrupted the loop, skip it
+            loop_mills.pop()
+            loop_label.pop()
+            origSMB.pop()
+            origMaxBolus.pop()
+            SMBreason = {}                                              # clear for first filtered debug list
+            SMBreason['script'] = '---------- Script Debug --------------------\n'
+            return 'MORE'       
         tempReq = basalFromReason(smb, lcount)
         origBasal.append(round(eval(tempReq), 4))
         
