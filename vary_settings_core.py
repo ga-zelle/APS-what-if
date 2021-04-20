@@ -259,28 +259,35 @@ def setVariant(stmp):
     ####################################################################################################################################
     # additional parameters collected here
     # these need an according modification in "determine_basal.py"
-    new_parameter = {}
-    temp          = {}                                 ### holds interim values in shorter notation
-    # first, do the AAPS standard assignments          ### variations are set in the <variant>.dat file
-    new_parameter['maxDeltaRatio'] = 0.2               ### add'l parameter; AAPS is fix at 0.2
-    new_parameter['SMBRatio'] = 0.5001                 ### add'l parameter; AAPS is fix at 0.5; I use 0.7 as no other rig interferes
-    new_parameter['thresholdRatio'] = 0.5              ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
-    new_parameter['maxBolusIOBUsual'] = True           ### add'l parameter; AAPS is fix at True, but my basal is too low
-    new_parameter['maxBolusIOBRatio'] = 1              ### add'l parameter; AAPS is fix at 1, but my basal is too low
-    new_parameter['maxBolusTargetRatio'] = 1.001       ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
-    new_parameter['insulinCapBelowTarget'] = False     ### add'l parameter; AAPS is fix at False; enable capping below
-    new_parameter['CapFactor'] = 0                     ### add'l parameter; AAPS is fix at 0; recently I used 4, but try 5
-    new_parameter['autoISF_flat'] = False              ### add'l parameter; AAPS is fix at False; disable autoISF fpr resistance
-    new_parameter['autoISF_slope'] = False             ### add'l parameter; AAPS is fix at False; disable autoISF for rise
-    new_parameter['autoISF_low'] = False               ### add'l parameter; AAPS is fix at False; disable autoISF for lows
-    new_parameter['CheckLibreError'] = False           ### add'l parameter: AAPS 2.7 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
-    new_parameter['AAPS_Version'] = AAPS_Version       ### place it before soo it could be modified later
-    new_parameter['bestParabola'] = False              ### add'l parameter; AAPS is fix at False; True for fit of quadratic curve
-    new_parameter['LessSMBatModerateBG'] = False       ### additional parameter; AAPS is fix at False; reduce SMB if ...
-    new_parameter['LessSMBbelow'] = 0.0                ### ... bg below this value
-    if AAPS_Version == '<2.7':
-        profile['maxUAMSMBBasalMinutes'] = 30          ### use the 2.7 default just in case
-        profile['bolus_increment'] = 0.1               ### use the 2.7 default just in case
+    profile['use_autoisf'] = False                      ### not enabled in standard AAPS and not even available
+    profile['enableautoisf_with_COB'] = False           ### Default in AAPS prototype     
+    profile['autoisf_max'] = 1.2                        ### Default in AAPS prototype    
+    profile['autoisf_hourlychange'] = 0.2               ### Default in AAPS prototype    
+    profile['smb_delivery_ratio'] = 0.5                 ### the AAPS standard   
+    profile['smb_delivery_ratio_bg_range'] = 0          ### disables linear rise of SMB_delivery_ratio   
+    profile['smb_max_range_extension'] = 1              ### the AAPS standard   
+    new_parameter = {}                                  
+    temp          = {}                                  ### holds interim values in shorter notation
+    # first, do the AAPS standard assignments           ### variations are set in the <variant>.dat file
+    new_parameter['maxDeltaRatio'] = 0.2                ### add'l parameter; AAPS is fix at 0.2
+    new_parameter['SMBRatio'] = 0.5001                  ### add'l parameter; AAPS is fix at 0.5; I use 0.7 as no other rig interferes
+    new_parameter['thresholdRatio'] = 0.5               ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
+    new_parameter['maxBolusIOBUsual'] = True            ### add'l parameter; AAPS is fix at True, but my basal is too low
+    new_parameter['maxBolusIOBRatio'] = 1               ### add'l parameter; AAPS is fix at 1, but my basal is too low
+    new_parameter['maxBolusTargetRatio'] = 1.001        ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
+    new_parameter['insulinCapBelowTarget'] = False      ### add'l parameter; AAPS is fix at False; enable capping below
+    new_parameter['CapFactor'] = 0                      ### add'l parameter; AAPS is fix at 0; recently I used 4, but try 5
+    new_parameter['autoISF_flat'] = False               ### add'l parameter; AAPS is fix at False; disable autoISF fpr resistance
+    new_parameter['autoISF_slope'] = False              ### add'l parameter; AAPS is fix at False; disable autoISF for rise
+    new_parameter['autoISF_low'] = False                ### add'l parameter; AAPS is fix at False; disable autoISF for lows
+    new_parameter['CheckLibreError'] = False            ### add'l parameter: AAPS 2.7 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
+    new_parameter['AAPS_Version'] = AAPS_Version        ### place it before so it could be modified later
+    new_parameter['bestParabola'] = False               ### add'l parameter; AAPS is fix at False; True for fit of quadratic curve
+    new_parameter['LessSMBatModerateBG'] = False        ### additional parameter; AAPS is fix at False; reduce SMB if ...
+    new_parameter['LessSMBbelow'] = 0.0                 ### ... bg below this value
+    if AAPS_Version == '<2.7':                          
+        profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
+        profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
     ####################################################################################################################################
     STAIR = {}                                                                  # for staircase type functions like basal
     INTERPOL = []                                                               # for linear interpolation between values
