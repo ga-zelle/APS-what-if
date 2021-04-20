@@ -1,6 +1,8 @@
-19.Apr.2021
+20.Apr.2021
 ===========
-Skip events flaged as  "Error: CGM data is unchanged for the past ~45m. "
+Debugging
+ - Skip events flaged as  "Error: CGM data is unchanged for the past ~45m. "
+ - added more default settings
 
 
 
