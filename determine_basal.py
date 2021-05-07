@@ -239,10 +239,14 @@ def autoISF(sens, target_bg, profile, glucose_status, meal_data, autosens_data, 
         return sens
         
     if meal_data['mealCOB'] > 0:                                # no action while digesting carbs
-        console_error("autoISF by-passed; mealCOB of  "+str(round(meal_data['mealCOB'],1)) )
-        Flows.append(dict(title="autoISF by-passed\ndue to presence\nof mealCOB "+str(round(meal_data['mealCOB'],2)), indent='0', adr='isf_184+'))
-        Fcasts['emulISF'] = sens
-        return sens
+        skip_it = True
+        if 'enableautoisf_with_COB' in profile:                 # private feature
+            skip_it = not profile['enableautoisf_with_COB']
+        if skip_it:
+            console_error("autoISF by-passed; mealCOB of  "+str(round(meal_data['mealCOB'],1)) )
+            Flows.append(dict(title="autoISF by-passed\ndue to presence\nof mealCOB "+str(round(meal_data['mealCOB'],2)), indent='0', adr='isf_184+'))
+            Fcasts['emulISF'] = sens
+            return sens
     
     if 'dura05' in glucose_status:                              # the AAPS 2.7 method
         dura05 = short(glucose_status['dura05'])                # minutes of staying within +/-5% range
@@ -321,7 +325,17 @@ def autoISF(sens, target_bg, profile, glucose_status, meal_data, autosens_data, 
             #    whereto = "less"
             Fcasts['emulISF'] = sens
             return sens
-    sens = round(min(sens, profile['sens'] / max(min(maxISFAdaptation, max(slopeISF, levelISF)), sensitivityRatio)), 1)    # include possible larger autosens effect
+    if 'BZ_ISF' in new_parameter:
+        BZ_ISF = new_parameter['BZ_ISF']
+        console_error("Automation alternative from glucose strengthens ISF by", str(round(BZ_ISF,2)))
+    else:
+        BZ_ISF = 1
+    if 'Delta_ISF' in new_parameter:
+        Delta_ISF = new_parameter['Delta_ISF']
+        console_error("Automation alternative from Delta strengthens ISF by", str(round(Delta_ISF,2)))
+    else:
+        Delta_ISF = 1
+    sens = round(min(sens, profile['sens'] / max(min(maxISFAdaptation, max(slopeISF, levelISF, BZ_ISF, Delta_ISF)), sensitivityRatio)), 1)    # include possible larger autosens effect
     Fcasts['emulISF'] = sens
     emulAI_ratio[-1] = levelISF*10
     return sens
