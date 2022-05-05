@@ -1,3 +1,18 @@
+05.May.2021
+===========
+Adapted for AAPS version 3.0.0., still backward compatible down to version 2.5 as far as regular AAPS featutres are concerned
+Added the autoISF features to its version 2.2.6
+ - the various ISF factors are listed separately and replace the varius interim ISF columns
+Added echo of script versions used and start parameters defined for accountability
+Replaced TAB-file by CSV-File , ready for import into a spreadsheet
+ - added option to select decimal symbol "." or ","
+Added commands to define circumdian profiles for basal, ISF, carb rartio 
+Removed bugs
+ - handle loop executions in between the 5 minute cycle
+ - European daylight savings time added until starting summer 2022
+ 
+ 
+
 20.Apr.2021
 ===========
 Debugging
