@@ -1,3 +1,7 @@
+This branch is still under development to cover 
+- the migration to AAPS 3.0.0.1 
+- to include the autoISF2.2 capabilities
+
 # APS-what-if
 
 I translated the original java code of "determineSMB-basal" into python and can run it on a PC. 
@@ -15,5 +19,5 @@ The main result in tabular and graphical output is the change in insulin require
 Related data like SGV, target, Autosens ratio etc. are also shown.
 
 A special output is the flowchart which helps to understand the logic flow through the loop. This is the 
-track which statements in "determineSB-basal" were executed and which not together with the reasoning 
-of those decisions listed in the original code.
+track which statements in "determineSMB-basal" were executed and which not together with the reasoning 
+of those decisions taken from the original code.
