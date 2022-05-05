@@ -1,9 +1,10 @@
-import  os
+import  os, sys
 import  glob
 #from Lib import subprocess
 import  contextlib
 import  io
 import  traceback
+from datetime import datetime
 
 from tkinter import *
 from tkinter import ttk
@@ -97,6 +98,7 @@ def reset_all():
     # result frame
     logfil.set('')
     tabfil.set('')
+    deltafil.set('')
     txtorig.set('')
     txtemul.set('')
     pdffil.set('')
@@ -246,8 +248,10 @@ def clearchecks():
     useas_ratio.set('off')
     useai_ratio.set('off')
     userange.set('off')
-    useslope.set('off')
-    useparabola.set('off')
+    usebestslope.set('off')
+    usefitsslope.set('off')
+    usebestparabola.set('off')
+    usefitsparabola.set('off')
     useISF.set('off')
     if raw.get() == 'most':
         usepred.set('on')
@@ -270,8 +274,10 @@ def optionLabels(show):
     chkas_ratio['text'] = show + ' autosense ratio'
     chkai_ratio['text'] = show + ' autoISF ratio'
     chkrange['text']    = show + ' range parameters'
-    chkslope['text']    = show + ' slope parameters'
-    chkparabola['text'] = show + ' parabola'
+    chkbestslope['text']    = show + ' best slope'
+    chkfitsslope['text']    = show + ' other slopes'
+    chkbestparabola['text'] = show + ' best parabola'
+    chkfitsparabola['text'] = show + ' other parabolas'
     chkISF['text']      = show + ' ISF'
     chkpred['text']     = show + ' predictions'
     
@@ -302,7 +308,7 @@ def act(using, thisOpt):
     pass
     
 def radioAll():
-    optHeader.set("\n")                
+    optHeader.set("\n                                                                                       ")                
     raw.set('All')
     doit.delete('1.0', 'end')
     doit.insert('end', 'All')
@@ -310,6 +316,7 @@ def radioAll():
     glucframe.grid_remove()
     isf_frame.grid_remove()
     insuframe.grid_remove()
+    noframe.grid()
     clearchecks()
     
 def radioMost():
@@ -321,6 +328,7 @@ def radioMost():
     glucframe.grid()
     isf_frame.grid()
     flowframe.grid()
+    noframe.grid_remove()
     doit.insert('end', 'All/-pred/-flowchart')
     optionLabels('Hide')
 
@@ -333,7 +341,14 @@ def radioSome():
     glucframe.grid()
     isf_frame.grid()
     flowframe.grid()
+    noframe.grid_remove()
     optionLabels('Show')
+
+def radioComma():
+    decim.set(',')
+    
+def radioPeriod():
+    decim.set('.')
 
 outframe.columnconfigure(1, weight=1)
 outframe.columnconfigure(2, weight=1)
@@ -343,15 +358,17 @@ doit = Text(outframe, state='normal', width=76, height=1)                       
 doit.grid(column=1, row=1, columnspan=3, padx=5, sticky='w')
 
 optHeader = StringVar()
-ttk.Label(outframe, textvariable=optHeader).grid(column=1, row=19, columnspan=3, padx=5, sticky=(W))
+ttk.Label(outframe, textvariable=optHeader).grid(column=2, row=19, columnspan=3, padx=5, sticky=(W))
 insuframe = ttk.Labelframe(outframe, width=250, height=400, text='Insulin chart content')
-insuframe.grid(row= 20, column=1, padx=20, pady=5, sticky=(W,N))
+insuframe.grid(row= 20, column=2, padx=20, pady=5, sticky=(W,N))
 glucframe = ttk.Labelframe(outframe, width=250, height=400, text='Glucose chart content          ') # same width as autoISF frame
-glucframe.grid(row= 20, column=2, padx=20, pady=5, sticky=(W,N))
+glucframe.grid(row= 20, column=3, padx=20, pady=5, sticky=(W,N))
 isf_frame = ttk.Labelframe(outframe, width=250, height=400, text='specials, e.g. autoISF')
-isf_frame.grid(row= 30, column=2, padx=20, pady=5, sticky=(W,N))
+isf_frame.grid(row= 30, column=3, padx=20, pady=5, sticky=(W,N))
 flowframe = ttk.Labelframe(outframe, width=250, height=400, text='Flowchart ON/OFF')
-flowframe.grid(row= 20, column=3, padx=20, pady=5, sticky=(W,N))
+flowframe.grid(row= 20, column=4, padx=20, pady=5, sticky=(W,N))
+noframe = ttk.Labelframe(outframe, width=510, height=100, text='')
+noframe.grid(row=20, column=2, columnspan=3, padx=20, pady=5, sticky=(W,N))
 
 #   insulin chart options     --------------------------------------------------
 def useinsReqChanged():     act(useinsReq.get(), "insReq")
@@ -434,23 +451,35 @@ chkrange = ttk.Checkbutton(isf_frame, text='Show range', \
             command=userangeChanged, variable=userange, onvalue='on', offvalue='off')
 chkrange.grid(column=0, row=8, columnspan=2, sticky=(W), padx=5)
 
-def useslopeChanged():   act(useslope.get(), "slope")
-useslope = StringVar()
-chkslope = ttk.Checkbutton(isf_frame, text='Show slope', \
-            command=useslopeChanged, variable=useslope, onvalue='on', offvalue='off')
-chkslope.grid(column=0, row=9, columnspan=2, sticky=(W), padx=5)
+def usebestslopeChanged():   act(usebestslope.get(), "bestslope")
+usebestslope = StringVar()
+chkbestslope = ttk.Checkbutton(isf_frame, text='Show best slope', \
+            command=usebestslopeChanged, variable=usebestslope, onvalue='on', offvalue='off')
+chkbestslope.grid(column=0, row=9, columnspan=2, sticky=(W), padx=5)
 
-def useparabolaChanged():   act(useparabola.get(), "bestParabola/fitsParabola")
-useparabola = StringVar()
-chkparabola = ttk.Checkbutton(isf_frame, text='Show parabolas', \
-            command=useparabolaChanged, variable=useparabola, onvalue='on', offvalue='off')
-chkparabola.grid(column=0, row=10, columnspan=2, sticky=(W), padx=5)
+def usefitsslopeChanged():   act(usefitsslope.get(), "fitsslope")
+usefitsslope = StringVar()
+chkfitsslope = ttk.Checkbutton(isf_frame, text='Show other slopes', \
+            command=usefitsslopeChanged, variable=usefitsslope, onvalue='on', offvalue='off')
+chkfitsslope.grid(column=0, row=10, columnspan=2, sticky=(W), padx=5)
+
+def usebestparabolaChanged():   act(usebestparabola.get(), "bestParabola")
+usebestparabola = StringVar()
+chkbestparabola = ttk.Checkbutton(isf_frame, text='Show best parabola', \
+            command=usebestparabolaChanged, variable=usebestparabola, onvalue='on', offvalue='off')
+chkbestparabola.grid(column=0, row=11, columnspan=2, sticky=(W), padx=5)
+
+def usefitsparabolaChanged():   act(usefitsparabola.get(), "fitsParabola")
+usefitsparabola = StringVar()
+chkfitsparabola = ttk.Checkbutton(isf_frame, text='Show other parabolas', \
+            command=usefitsparabolaChanged, variable=usefitsparabola, onvalue='on', offvalue='off')
+chkfitsparabola.grid(column=0, row=12, columnspan=2, sticky=(W), padx=5)
 
 def useISFChanged():   act(useISF.get(), "ISF")
 useISF = StringVar()
 chkISF = ttk.Checkbutton(isf_frame, text='Show ISF', \
             command=useISFChanged, variable=useISF, onvalue='on', offvalue='off')
-chkISF.grid(column=0, row=11, columnspan=2, sticky=(W), padx=5)
+chkISF.grid(column=0, row=13, columnspan=2, sticky=(W), padx=5)
 
 #   flowchart options     ------------------------------------------------------
 def useflowChanged():       act(useflow.get(), "flowchart")
@@ -459,17 +488,25 @@ chkflow = ttk.Checkbutton(flowframe, text='Create flowchart', \
             command=useflowChanged, variable=useflow, onvalue='on', offvalue='off')
 chkflow.grid(column=0, row=1, columnspan=2, sticky=(W), padx=5)
 
+#   this selects the decimal symbol
+ttk.Label(outframe, text="\nSelect the decimal symbol for output tables").grid(column=1, row=2, columnspan=1, padx=5, sticky=(W))
+decim = StringVar()
+comma = ttk.Radiobutton(outframe, variable=decim, value=',', command=radioComma,  text='use ","')
+period= ttk.Radiobutton(outframe, variable=decim, value='.', command=radioPeriod, text='use "."')
+radioComma()                                                                     # initial default
+comma.grid(column=1,  row=11, padx=20, sticky=W)
+period.grid(column=1, row=12, padx=20, sticky=W)
+
 #   this is placed last because their commands refer to above defs
-ttk.Label(outframe, text="\nCoarse grained selection of graphics output").grid(column=1, row=2, columnspan=3, padx=5, sticky=(W))
+ttk.Label(outframe, text="\nCoarse grained selection of graphics output").grid(column=2, row=2, columnspan=3, padx=5, sticky=(W))
 raw  = StringVar()
 some = ttk.Radiobutton(outframe, variable=raw, value='some', command=radioSome, text='just a few')
 most = ttk.Radiobutton(outframe, variable=raw, value='most', command=radioMost, text='most (i.e.  All but a few)')
 all  = ttk.Radiobutton(outframe, variable=raw, value='All',  command=radioAll,  text='All')
 radioMost()                                                                     # initial default
-some.grid(column=1, row=11, padx=20, sticky=W)
-most.grid(column=1, row=12, padx=20, sticky=W)
-all.grid( column=1, row=13, padx=20, sticky=W)
-
+some.grid(column=2, row=11, columnspan=3, padx=20, sticky=W)
+most.grid(column=2, row=12, columnspan=3, padx=20, sticky=W)
+all.grid( column=2, row=13, columnspan=3, padx=20, sticky=W)
 
 
 #################################################################################
@@ -484,9 +521,16 @@ def get_logfil():
     if newaf != "":
         logfil.set(newaf)
 
+def get_deltafil():
+    oldaf = deltafil.get()
+    loglist = {'deltafile {.delta}'}  
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    if newaf != "":
+        deltafil.set(newaf)
+
 def get_tabfil():
     oldaf = tabfil.get()
-    loglist = {'logfile {.tab}'}  
+    loglist = {'table {.csv .tab}'}  
     newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
     if newaf != "":
         tabfil.set(newaf)
@@ -524,10 +568,22 @@ def edit_logfil():
             sub_issue(ele[:-1])                                                 # sub appends <CR>
         sub_issue(str(sys.exc_info()[1]))
 
+def edit_deltafil():
+    oldvf = deltafil.get()
+    try:
+        os.startfile(oldvf)                                                     # requires DOS knows to edit ".delta" files
+    except:                                                                     # catch *all* exceptions
+        book.select(4)                                                          # activate result tab
+        tb = sys.exc_info()[2]
+        sub_issue("Problem in vary_GUI.py")
+        for ele in traceback.format_tb(tb):
+            sub_issue(ele[:-1])                                                 # sub appends <CR>
+        sub_issue(str(sys.exc_info()[1]))
+
 def edit_tabfil():
     oldvf = tabfil.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
+        os.startfile(oldvf)                                                     # requires DOS knows to edit ".csv" files
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -584,33 +640,40 @@ logfil_entry.grid(column=0, columnspan=3, row=rfilRow, sticky=(W,E), padx=5)
 ttk.Button(resframe, text="Browse", command=get_logfil).grid( column=3, row=rfilRow, sticky=(W, E), padx=10)
 ttk.Button(resframe, text="Show",   command=edit_logfil).grid(column=4, row=rfilRow, sticky=(W, E), padx=10)
 
-ttk.Label(resframe, text="\n*.tab - Your table comparing key values of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+1, sticky=(W), padx=5)
+ttk.Label(resframe, text="\n*.csv - Your table comparing key values of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+1, sticky=(W), padx=5)
 tabfil = StringVar()
 tabfil_entry = ttk.Entry(resframe, width=130, textvariable=tabfil)              #, justify='right')
 tabfil_entry.grid(column=0, columnspan=3, row=rfilRow+2, sticky=(W,E), padx=5)
 ttk.Button(resframe, text="Browse", command=get_tabfil).grid( column=3, row=rfilRow+2, sticky=(W, E), padx=10)
 ttk.Button(resframe, text="Show",   command=edit_tabfil).grid(column=4, row=rfilRow+2, sticky=(W, E), padx=10)
 
-ttk.Label(resframe, text="\n*.orig.txt - Your short log of original analysis").grid(column=0, columnspan=2, row=rfilRow+3, sticky=(W), padx=5)
+ttk.Label(resframe, text="\n*.delta - Your table comparing bg deltas of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+3, sticky=(W), padx=5)
+deltafil = StringVar()
+deltafil_entry = ttk.Entry(resframe, width=130, textvariable=deltafil)            #, justify='right')
+deltafil_entry.grid(column=0, columnspan=3, row=rfilRow+4, sticky=(W,E), padx=5)
+ttk.Button(resframe, text="Browse", command=get_deltafil).grid( column=3, row=rfilRow+4, sticky=(W, E), padx=10)
+ttk.Button(resframe, text="Show",   command=edit_deltafil).grid(column=4, row=rfilRow+4, sticky=(W, E), padx=10)
+
+ttk.Label(resframe, text="\n*.orig.txt - Your short log of original analysis").grid(column=0, columnspan=2, row=rfilRow+5, sticky=(W), padx=5)
 txtorig = StringVar()
 txtorig_entry = ttk.Entry(resframe, width=130, textvariable=txtorig)              #, justify='right')
-txtorig_entry.grid(column=0, columnspan=3, row=rfilRow+4, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_txtorig).grid( column=3, row=rfilRow+4, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_txtorig).grid(column=4, row=rfilRow+4, sticky=(W, E), padx=10)
+txtorig_entry.grid(column=0, columnspan=3, row=rfilRow+6, sticky=(W,E), padx=5)
+ttk.Button(resframe, text="Browse", command=get_txtorig).grid( column=3, row=rfilRow+6, sticky=(W, E), padx=10)
+ttk.Button(resframe, text="Show",   command=edit_txtorig).grid(column=4, row=rfilRow+6, sticky=(W, E), padx=10)
 
-ttk.Label(resframe, text="\n*.txt - Your short log of emulated analysis").grid(column=0, columnspan=2, row=rfilRow+5, sticky=(W), padx=5)
+ttk.Label(resframe, text="\n*.txt - Your short log of emulated analysis").grid(column=0, columnspan=2, row=rfilRow+7, sticky=(W), padx=5)
 txtemul = StringVar()
 txtemul_entry = ttk.Entry(resframe, width=130, textvariable=txtemul)              #, justify='right')
-txtemul_entry.grid(column=0, columnspan=3, row=rfilRow+6, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_txtemul).grid( column=3, row=rfilRow+6, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_txtemul).grid(column=4, row=rfilRow+6, sticky=(W, E), padx=10)
+txtemul_entry.grid(column=0, columnspan=3, row=rfilRow+8, sticky=(W,E), padx=5)
+ttk.Button(resframe, text="Browse", command=get_txtemul).grid( column=3, row=rfilRow+8, sticky=(W, E), padx=10)
+ttk.Button(resframe, text="Show",   command=edit_txtemul).grid(column=4, row=rfilRow+8, sticky=(W, E), padx=10)
 
-ttk.Label(resframe, text="\n*.pdf etc. - Your graphic file comparing key values of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+7, sticky=(W), padx=5)
+ttk.Label(resframe, text="\n*.pdf etc. - Your graphic file comparing key values of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+9, sticky=(W), padx=5)
 pdffil = StringVar()
 pdffil_entry = ttk.Entry(resframe, width=130, textvariable=pdffil)              #, justify='right')
-pdffil_entry.grid(column=0, columnspan=3, row=rfilRow+8, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_pdffil).grid( column=3, row=rfilRow+8, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_pdffil).grid(column=4, row=rfilRow+8, sticky=(W, E), padx=10)
+pdffil_entry.grid(column=0, columnspan=3, row=rfilRow+10, sticky=(W,E), padx=5)
+ttk.Button(resframe, text="Browse", command=get_pdffil).grid( column=3, row=rfilRow+10, sticky=(W, E), padx=10)
+ttk.Button(resframe, text="Show",   command=edit_pdffil).grid(column=4, row=rfilRow+10, sticky=(W, E), padx=10)
 
 
 
@@ -623,9 +686,36 @@ def clear_msg():
     lfd.delete(1.0, 'end')
     lfd['state'] = 'disabled'
     
+def echo_version(mdl):
+    global echo_msg
+    #mdl= 'vary_settings_batch.py'
+    stamp = os.stat(varyHome + mdl)
+    stposx= datetime.fromtimestamp(stamp.st_mtime)
+    ststr = datetime.strftime(stposx, "%Y-%m-%d %H:%M:%S")
+    echo_msg[ststr] = mdl
+    return 
+
 def sub_emul():
-    global runState 
+    global runState, varyHome
     runState.set('Checking inputs ...   ')
+    varyHome= sys.argv[0]                           # command used to start this script
+    whereColon = varyHome.find(':')
+    if whereColon < 0:
+        varyHome = os.getcwd()
+    varyHome = os.path.dirname(varyHome) + '\\'
+    m  = '='*66+'\nEcho of software versions used\n'+'-'*66
+    m +='\n vary_settings home directory  ' + varyHome
+    global echo_msg
+    echo_msg = {}
+    echo_version('vary_settings_GUI.py')
+    echo_version('vary_settings_core.py')
+    echo_version('determine_basal.py')
+    for ele in echo_msg:
+        m += '\n dated: '+ele + ',   module name: '+echo_msg[ele]
+    #m += '\n' + '='*66 + '\n'
+    m += '\n'+'-'*66+'\nEcho of execution parameters used\n'+'-'*66
+    m += '\nLogfile(s) to scan    ' + afil.get()
+
     ttk.Label(runframe, textvariable=runState, style='TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
     incomplete = False                                                          # update frame display
     variant = os.path.basename(vfil.get())
@@ -636,24 +726,42 @@ def sub_emul():
     if gopt == '':
         sub_issue('graphics output options are missing')
         incomplete = True
+    m += '\nOutput options        ' + gopt
     gopt = 'Windows/' + gopt                                                    # i.e. not in Android
+    #m_default = ''
+    #if gopt.find('.') >= 0 :
+    #    my_decimal = '.'
+    #elif gopt.find(',') >= 0 :
+    #    my_decimal = ',' 
+    #else:
+    #    my_decimal = ','
+    #    m_default = ' (default)'                   # the default
+    my_decimal = decim.get()
+    m += '\nDecimal symbol        ' + my_decimal
     if afil.get() == '':
         sub_issue('AndroidAPS logfile is missing')
         incomplete = True
     if stmpStart.get() == 'no':
         useStart = noStart
+        m_default = ' (default)'
     else:
         useStart = tstart.get()
         if useStart == '':
             sub_issue('start time ticked but missing')
             incomplete = True
+        m_default = ''
+    m += '\nStart of time window  ' + useStart + m_default
     if stmpStopp.get() == 'no':
         useStopp = noStopp
+        m_default = ' (default)'
     else:
         useStopp = tstopp.get()
         if useStopp == '':
             sub_issue('stop time ticked but missing')
             incomplete = True
+        m_default = ''
+    m += '\nEnd of time window    ' + useStopp + m_default
+    m += '\n' + '='*66 + '\n'
     if incomplete:
         runState.set(notRunning)
         lfd['state'] = 'disabled'
@@ -664,7 +772,7 @@ def sub_emul():
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
-        thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries)
+        thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
         if thisTime == 'SYNTAX':
             runState.set('Emulation halted ... ')
             ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
@@ -685,7 +793,8 @@ def sub_emul():
             varLabel = variant[:-4]
             if ftype=='zip' or ftype.find(".")>=0:
                 logfil.set(fn_first+'.'+variant[:-4]+'.log')
-                tabfil.set(fn_first+'.'+variant[:-4]+'.tab')
+                tabfil.set(fn_first+'.'+variant[:-4]+'.csv')
+                deltafil.set(fn_first+'.'+variant[:-4]+'.delta')
                 txtorig.set(fn_first+'.' + 'orig' +  '.txt')
                 txtemul.set(fn_first+'.'+variant[:-4]+'.txt')
                 pdffil.set(fn_first+'.'+variant[:-4]+'.pdf')

@@ -72,6 +72,14 @@ def alarmHours(titel):
         elif pressed_button == 1:           sys.exit()                      # EXIT
     return pick
 
+def echo_version(mdl):
+    global echo_msg
+    #mdl= 'vary_settings_batch.py'
+    stamp = os.stat(varyHome + mdl)
+    stposx= datetime.fromtimestamp(stamp.st_mtime)
+    ststr = datetime.strftime(stposx, "%Y-%m-%d %H:%M:%S")
+    echo_msg[ststr] = mdl
+    return 
 
 ###############################################
 ###    start of main                        ###
@@ -82,22 +90,32 @@ how_to_print = 'print'
 #et_tty(runframe, lfd,  how_to_print)            # export print settings to main routine
 set_tty(0,        0,    how_to_print)            # export print settings to main routine
 
+global echo_msg
 
 # try whether we are on Android:
-test_dir  = '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'
-test_dir  = '/storage/emulated/0/Android/data/info.nightscout.androidaps/'          # always find it even when starting new logfile
+IsAndroid = False
+test_dir10= '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'    # always find it even when starting new logfile
 test_file = 'AndroidAPS.log'
-inh = glob.glob(test_dir+'*')
-#print (str(inh))
-if len(inh) > 0:
+inh10     = glob.glob(test_dir10+'*')            # for Android10 or less using AAPS 2.8.2
+if len(inh10) > 0:
     IsAndroid = True
+    test_dir = test_dir10
+    fn = test_dir + test_file
+
+test_dir11= '/storage/emulated/0/AAPS/logs/info.nightscout.androidaps/'
+inh11     = glob.glob(test_dir11+'*')            # for Android11+ using AAPS 3.0+
+if len(inh11) > 0:
+    IsAndroid = True
+    test_dir = test_dir11
+    fn = test_dir + test_file
+    
+if IsAndroid :
     import androidhelper
     droid=androidhelper.Android()
     #ClearScreenCommand = 'clear'                                           # done in --core.py
     
-    inh = glob.glob(test_dir+'files/AndroidAPS.log')
-    fn = inh[0]
-
+    #inh = glob.glob(test_dir+'files/AndroidAPS.log')
+    #fn = inh[0]
     myseek  = fn
 
     ###########################################################################
@@ -135,28 +153,8 @@ if len(inh) > 0:
         carb_ansage2 = 'grams during the next'
         carb_ansage3 = 'minutes'
         Speak_items = ["extra carbs", "extra bolus", "less bolus"]
-        Speak_Pick  = "Pick Items"
-    #else:
-    #    Speaker = 'nobody'
-        
+        Speak_Pick  = "Pick Items"       
 
-    ###########################################################################
-    #   the announcements dialog
-    ###########################################################################
-    #btns = ["Next", "Exit"]
-    #items = Speak_items
-    #pick = [0, 1, 2]
-    #while True:                                                             # what the lady speaks ...
-    #    default_pick = pick
-    #    pressed_button, selected_items_indexes = mydialog(Speak_Pick, btns, items, True, default_pick)
-    #    pick = selected_items_indexes
-    #    if   pressed_button ==-1:           sys.exit()                      # external BREAK
-    #    elif pressed_button == 0:           break                           # NEXT
-    #    elif pressed_button == 1:           sys.exit()                      # EXIT
-    #speak_extra_carbs = (0 in selected_items_indexes)
-    #speak_extra_bolus = (1 in selected_items_indexes)
-    #speak_less_bolus  = (2 in selected_items_indexes)
-        
 
     ###########################################################################
     #   the alarm hours dialog
@@ -165,8 +163,7 @@ if len(inh) > 0:
     #print('\nhours: '+str(pickExtraCarbs))     # the feature list what to plot
     #print('17hrs carbs', str( 17 in pickExtraCarbs))
 
-    pickMoreSMB = alarmHours("more SMB suggested")
-    
+    pickMoreSMB = alarmHours("more SMB suggested")    
     pickLessSMB = alarmHours("less SMB suggested")
 
 
@@ -174,9 +171,9 @@ if len(inh) > 0:
     #   the display items dialog
     ###########################################################################
     btns = ["Next", "Exit", "Test"]
-    items = ["bg", "target", "as ratio", "autoISF", "iob", "cob", "range", "slope", "ISF", "insReq", "SMB", "basal"]
-    width = [5,     6,          6,        11,        6,      6,      13,      13,    24,      13,      11,     14]
-    pick  = [0,                                              5,               7,       8,       9,     10]
+    items = ["bg", "target", "iob", "cob", "range", "bestslope", "ISF-factors", "ISFs", "insReq", "SMB", "basal"]
+    width = [5,     6,        6,      6,      13,      13,              37,       21,      13,      11,     12  ]
+    pick  = [0,                                                          6,        7,       8,       9          ]
     while True:
         default_pick = pick
         pressed_button, selected_items_indexes = mydialog("Pick outputs", btns, items, True, default_pick)
@@ -192,6 +189,19 @@ if len(inh) > 0:
             droid.ttsSpeak(str(cols))                                       # tell the sum
 
     arg2 = 'Android'+''.join(['/'+items[i] for i in selected_items_indexes])# the feature list what to plot
+    arg2+= '/.'                                                             # always decimal "." on Android
+    varyHome= '/storage/emulated/0/qpython/scripts3/'                       # command used to start this script
+    #varyHome = os.path.dirname(varyHome) + '\\'
+    m  = '='*66+'\nEcho of software versions used\n'+'-'*66
+    m +='\n vary_settings home directory  ' + varyHome
+    #global echo_msg
+    echo_msg = {}
+    echo_version('vary_settings_batch.py')
+    echo_version('vary_settings_core.py')
+    echo_version('determine_basal.py')
+    for ele in echo_msg:
+        m += '\n dated: '+ele + ',   module name: '+echo_msg[ele]
+    m += '\n' + '='*66 + '\n'
 
 
     ###########################################################################
@@ -199,8 +209,8 @@ if len(inh) > 0:
     ###########################################################################
     btns = ["Next", "Exit"]
     
-    varD = glob.glob(test_dir+'files/*.dat')        # outdated naming
-    varF = glob.glob(test_dir+'files/*.vdf')        # preferred new naming
+    varD = glob.glob(test_dir+'/*.dat')             # outdated naming
+    varF = glob.glob(test_dir+'/*.vdf')             # preferred new naming
     lstF = []   #[i for i in varF]
     for varFile in varF:
         lstF.append(os.path.basename(varFile))      # do not overwrite the calling arg value
@@ -209,8 +219,9 @@ if len(inh) > 0:
     pressed_button, selected_items_indexes = mydialog("Pick variant file", btns, lstF, False)
     if pressed_button != 0 or selected_items_indexes == []:
         sys.exit()    
-    varFile = test_dir + 'files/' + ''.join([lstF[i] for i in selected_items_indexes])
-
+    varFile = test_dir + ''.join([lstF[i] for i in selected_items_indexes]) 
+    my_decimal = '.'
+    
 
     ###########################################################################
     #   no more dialogs; go ahead
@@ -218,7 +229,7 @@ if len(inh) > 0:
     t_stoppLabel = '2099-00-00T00:00:00Z'           # defaults to end of centuary, i.e. open end
     t_startLabel = '2000-00-00T00:00:00Z'           # defaults to start of centuary, i.e. open start
 else:                                                                               # we are not on Android
-    IsAndroid = False
+    #IsAndroid = False
     #Settings for development on Windows with SMB events:
     #test_dir  = 'L:\PID\ISF\Android/'
     #test_file = 'AndroidAPS._2020-07-13_00-00-00_.2.zip'
@@ -226,17 +237,51 @@ else:                                                                           
     #ClearScreenCommand = 'cls'                     # done in --core.py
     maxItem = '144'    # shows all
 
-    myseek  = sys.argv[1] #+ '\\'
-    arg2    = 'Windows/' + sys.argv[2]              # the feature list what to plot
-    varFile = sys.argv[3]                           # the variant label
-    if len(sys.argv)>=6:
-        t_stoppLabel = sys.argv[5]                  # last loop time to evaluate
+    varyHome= sys.argv[0]                           # command used to start this script
+    whereColon = varyHome.find(':')
+    if whereColon < 0:
+        varyHome = os.getcwd()
+    varyHome = os.path.dirname(varyHome) + '\\'
+    m  = '='*66+'\nEcho of software versions used\n'+'-'*66
+    m +='\n vary_settings home directory  ' + varyHome
+    #global echo_msg
+    echo_msg = {}
+    echo_version('vary_settings_batch.py')
+    echo_version('vary_settings_core.py')
+    echo_version('determine_basal.py')
+    for ele in echo_msg:
+        m += '\n dated: '+ele + ',   module name: '+echo_msg[ele]
+    m += '\n'+'-'*66+'\nEcho of execution parameters used\n'+'-'*66
+    m += '\nLogfiles to scan      ' + sys.argv[1]
+    m += '\nOutput options        ' + sys.argv[2]
+    m_default = ''
+    if sys.argv[2].find('.') >= 0 :
+        my_decimal = '.'
+    elif sys.argv[2].find(',') >= 0 :
+        my_decimal = ',' 
     else:
-        t_stoppLabel = '2099-00-00T00:00:00Z'       # defaults to end of centuary, i.e. open end
+        my_decimal = ','
+        m_default = ' (default)'                   # the default
+    m += '\nDecimal symbol        ' + my_decimal + m_default
+    myseek  = sys.argv[1] #+ '\\'
+    arg2    = 'Windows/' + sys.argv[2]              # the feature list of what to plot
+    varFile = sys.argv[3]                           # the variant label
     if len(sys.argv)>=5:
-        t_startLabel = sys.argv[4]                  # first loop time to evaluate
+        t_startLabel = sys.argv[4]                  # first loop time to evaluate#
+        m_default = ''
     else:
         t_startLabel = '2000-00-00T00:00:00Z'       # defaults to start of centuary, i.e. open start
+        m_default = ' (default)'
+    m += '\nStart of time window  ' + t_startLabel + m_default
+    if len(sys.argv)>=6:
+        t_stoppLabel = sys.argv[5]                  # last loop time to evaluate
+        m_default = ''
+    else:
+        t_stoppLabel = '2099-00-00T00:00:00Z'       # defaults to end of centuary, i.e. open end
+        m_default = ' (default)'
+    m += '\nEnd of time window    ' + t_stoppLabel + m_default
+    m += '\n' + '='*66 + '\n'
+
 #print ('evaluate from '+t_startLabel+' up to '+t_stoppLabel)
 
 wdhl = 'yes'
@@ -244,7 +289,7 @@ entries = {}
 lastTime = '0'
 while wdhl[0]=='y':                                                                 # use CANCEL to stop/exit
     # All command line arguments known, go for main process
-    thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries)
+    thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal)
     if thisTime == 'SYNTAX':        break                                           # problem in VDF file
     #print('returned vary_ISF_batch:', CarbReqGram, ' minutes:',  CarbReqTime)
     if IsAndroid:
@@ -270,7 +315,7 @@ while wdhl[0]=='y':                                                             
         #print("less  bolus", str(thisInt in pickLessSMB), str(extraSMB))
         if (thisInt in pickLessSMB) and extraSMB<0 and thisTime>lastTime:
             droid.ttsSpeak(textLessSMB+str(extraSMB)+textUnit)                      # wake up user, also during sleep?
-        howLong = waitNextLoop(thisTime, varFile[len(test_dir)+6:-4])
+        howLong = waitNextLoop(thisTime, varFile[len(test_dir):-4])
         lastTime = thisTime        
         time.sleep(howLong)
     else:   break                                                                   # on Windows run only once
