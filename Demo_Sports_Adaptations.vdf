@@ -1,6 +1,3 @@
-profile     enable_autoISF                  False                                           ### for logs before autoISF
-profile     smb_delivery_ratio              0.5                                             ### AAPS default
-
 rofile      min_bg                          101                                             ### just above the temp target threshold for SMB
 profile     max_bg                          profile['min_bg']                               ### redefine target
 #rofile     target_bg                       int((profile['min_bg'] + profile['max_bg'])/2)  ### example of numerical expression
