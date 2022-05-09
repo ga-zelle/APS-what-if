@@ -357,16 +357,17 @@ ttk.Label(outframe, text="\nThe resulting graphics request string").grid(column=
 doit = Text(outframe, state='normal', width=76, height=1)                       # w=77 equals w=80 for Entry
 doit.grid(column=1, row=1, columnspan=3, padx=5, sticky='w')
 
+tStyle.configure('Blau.TLabelframe.Label', foreground='blue')
 optHeader = StringVar()
 ttk.Label(outframe, textvariable=optHeader).grid(column=2, row=19, columnspan=3, padx=5, sticky=(W))
-insuframe = ttk.Labelframe(outframe, width=250, height=400, text='Insulin chart content')
+insuframe = ttk.Labelframe(outframe, width=250, height=400, text="Insulin chart content", style='Blau.TLabelframe')
 insuframe.grid(row= 20, column=2, padx=20, pady=5, sticky=(W,N))
-glucframe = ttk.Labelframe(outframe, width=250, height=400, text='Glucose chart content          ') # same width as autoISF frame
+glucframe = ttk.Labelframe(outframe, width=250, height=400, style='Blau.TLabelframe', text='Glucose chart content          ') # same width as autoISF frame
 glucframe.grid(row= 20, column=3, padx=20, pady=5, sticky=(W,N))
-isf_frame = ttk.Labelframe(outframe, width=250, height=400, text='specials, e.g. autoISF')
+isf_frame = ttk.Labelframe(outframe, width=250, height=400, style='Blau.TLabelframe', text='specials, e.g. autoISF')
 isf_frame.grid(row= 30, column=3, padx=20, pady=5, sticky=(W,N))
-flowframe = ttk.Labelframe(outframe, width=250, height=400, text='Flowchart ON/OFF')
-flowframe.grid(row= 20, column=4, padx=20, pady=5, sticky=(W,N))
+flowframe = ttk.Labelframe(outframe, width=250, height=400, style='Blau.TLabelframe', text="Flowchart ON/OFF")
+flowframe.grid(row= 20, column=4, padx=20, pady=0, sticky=(W,N))
 noframe = ttk.Labelframe(outframe, width=510, height=100, text='')
 noframe.grid(row=20, column=2, columnspan=3, padx=20, pady=5, sticky=(W,N))
 
