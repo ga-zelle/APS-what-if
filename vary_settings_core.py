@@ -6,8 +6,7 @@
 #	Version INIT		Started	08.Dec.2019			Author	Gerhard Zellermann
 #   - adapted from scanAPSlog.py
 
-import sys
-import os
+import os, subprocess, sys
 import glob
 from email.utils import formatdate
 import datetime
@@ -126,6 +125,10 @@ def checkCarbsNeeded(Curly, lcount):
             Curly = Curly[:wo_apo-1]+Curly[wo_apo:]
             #print("found \' at position "+str(wo_apo)+"\n" +Curly)
     result = json.loads(Curly)
+    if 'reason' not in result:                                          # error like "could not calculate eventualBG"
+        CarbReqTime = ''
+        CarbReqGram = ''
+        return                                
     if result['reason'][:10] == 'Error: CGM':                           # like no CGM while loading transmitter
         CarbReqTime = ''
         CarbReqGram = ''
@@ -155,13 +158,13 @@ def checkCarbsNeeded(Curly, lcount):
 
 def basalFromReason(smb, lcount):
     #print('\nrow', str(lcount), str(smb))
-    suggest = smb['openaps']['suggested']
-    if 'rate' in suggest :
-        rateReq = suggest['rate']
-    elif 'extended' in smb['pump'] and 'TempBasalAbsoluteRate' in  smb['pump']['extended']:
+    #suggest = smb['openaps']['suggested']
+    if 'rate' in smb :
+        rateReq = smb['rate']
+    elif 'pump'in smb and 'extended' in smb['pump'] and 'TempBasalAbsoluteRate' in  smb['pump']['extended']:
         rateReq = smb['pump']['extended']['TempBasalAbsoluteRate']
     else:
-        rateReq = currenttemp['rate']         # keep exiusting rate ?
+        rateReq = currenttemp['rate']         # keep existing rate ?
     #print('rateReq in row '+str(lcount)+' from "suggest.json" is ['+str(rateReq)+']')
 
     return str(rateReq)
@@ -247,6 +250,22 @@ def basalFromEmulation(returned, lcount):
         tempReq = currenttemp['rate']           # no change, keep current basal rate
     return str(round(tempReq,4))
 
+def STAIR_scan(stmp, myVal, woSTAIR, type_len, STAIR_json):
+    # times must be in Greenwich time i.e. UTC but sorted from 0-23
+    stmp_day = stmp[:11]
+    for STEP in STAIR_json:
+        newVal = STAIR_json[STEP]
+        break                                                           # use first entry to extrapolate backwards
+    for STEP in STAIR_json:
+        if stmp_day+STEP == stmp:
+            newVal = STAIR_json[STEP]
+            break
+        elif stmp_day+STEP > stmp:
+            break
+        newVal = STAIR_json[STEP]
+    myVal = myVal[:woSTAIR] + str(newVal) + myVal[woSTAIR+6+type_len:]
+    return myVal
+
 def setVariant(stmp):
     # set the what-if scenario
     global autosens_data
@@ -259,13 +278,7 @@ def setVariant(stmp):
     ####################################################################################################################################
     # additional parameters collected here
     # these need an according modification in "determine_basal.py"
-    profile['use_autoisf'] = False                      ### not enabled in standard AAPS and not even available
-    profile['enableautoisf_with_COB'] = False           ### Default in AAPS prototype     
-    profile['autoisf_max'] = 1.2                        ### Default in AAPS prototype    
-    profile['autoisf_hourlychange'] = 0.2               ### Default in AAPS prototype    
-    profile['smb_delivery_ratio'] = 0.5                 ### the AAPS standard   
-    profile['smb_delivery_ratio_bg_range'] = 0          ### disables linear rise of SMB_delivery_ratio   
-    profile['smb_max_range_extension'] = 1              ### the AAPS standard   
+    #rofile['use_autoisf'] = False                      ### not enabled in standard AAPS and not even available
     new_parameter = {}                                  
     temp          = {}                                  ### holds interim values in shorter notation
     # first, do the AAPS standard assignments           ### variations are set in the <variant>.dat file
@@ -277,20 +290,20 @@ def setVariant(stmp):
     new_parameter['maxBolusTargetRatio'] = 1.001        ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
     new_parameter['insulinCapBelowTarget'] = False      ### add'l parameter; AAPS is fix at False; enable capping below
     new_parameter['CapFactor'] = 0                      ### add'l parameter; AAPS is fix at 0; recently I used 4, but try 5
-    new_parameter['autoISF_flat'] = False               ### add'l parameter; AAPS is fix at False; disable autoISF fpr resistance
-    new_parameter['autoISF_slope'] = False              ### add'l parameter; AAPS is fix at False; disable autoISF for rise
-    new_parameter['autoISF_low'] = False                ### add'l parameter; AAPS is fix at False; disable autoISF for lows
     new_parameter['CheckLibreError'] = False            ### add'l parameter: AAPS 2.7 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
     new_parameter['AAPS_Version'] = AAPS_Version        ### place it before so it could be modified later
-    new_parameter['bestParabola'] = False               ### add'l parameter; AAPS is fix at False; True for fit of quadratic curve
     new_parameter['LessSMBatModerateBG'] = False        ### additional parameter; AAPS is fix at False; reduce SMB if ...
     new_parameter['LessSMBbelow'] = 0.0                 ### ... bg below this value
     if AAPS_Version == '<2.7':                          
         profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
         profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
     ####################################################################################################################################
-    STAIR = {}                                                                  # for staircase type functions like basal
-    INTERPOL = []                                                               # for linear interpolation between values
+    STAIR    = {}                                                                   # for general, profile like definitions
+    STAIR_BAS= {}                                                                   # for profile definition of basal rate
+    STAIR_CR = {}                                                                   # for profile definition of carb ratio
+    STAIR_ISF= {}                                                                   # for profile definition of ISF
+    INTERPOL = []                                                                   # for linear interpolation between times
+    POLYGON  = []                                                                   # for linear interpolation between numbers
     flag_staircase = False
     # read the variations and apply them
     fnam= varLabel + '.dat'
@@ -317,8 +330,18 @@ def setVariant(stmp):
                 while myVal[-1] == ' ' :    myVal = myVal[:-1]                      # truncate trailing BLANKS
             #print('['+myArray+'], ['+myItem+'], ['+myVal+']')
            
+            woSTAIR = myVal.find('STAIR_')
+            if woSTAIR >= 0:                                                        # get value from last valid step
+                if   myVal[woSTAIR+6:woSTAIR+9] == 'BAS':    myVal = STAIR_scan(stmp, myVal, woSTAIR, 3, STAIR_BAS)
+                elif myVal[woSTAIR+6:woSTAIR+8] == 'CR' :    myVal = STAIR_scan(stmp, myVal, woSTAIR, 2, STAIR_CR)
+                elif myVal[woSTAIR+6:woSTAIR+9] == 'ISF':    myVal = STAIR_scan(stmp, myVal, woSTAIR, 3, STAIR_ISF)
+                else:                                        print('key', myVal[woSTAIR+6:woSTAIR+9], 'nicht gefunden')
+
             woSTAIR = myVal.find('STAIR')
             if woSTAIR >= 0:                                                        # get value from last valid step
+                for STEP in STAIR:
+                    newVal = STAIR[STEP]
+                    break                                                           # use first entry to extrapolate backwards
                 for STEP in STAIR:
                     if STEP == stmp:
                         newVal = STAIR[STEP]
@@ -365,6 +388,46 @@ def setVariant(stmp):
                         lowLabl= STEP
                 myVal = myVal[:woINTERPOL] + str(newVal) + myVal[woINTERPOL+8:]
 
+            woPOLYGON = myVal.find('POLYGON')
+            if woPOLYGON>= 0:                                                       # get value from last valid step
+                xstr = hole(myVal, woPOLYGON+7, '(', ')')                           # get the argument
+                xdata = eval(xstr)
+                #print('polygon', xstr, str(xdata), '\n'+str(POLYGON))
+                (STEP,  sVal)  = POLYGON[0]                                         # low end tuple
+                (STEPt, sValt) = POLYGON[len(POLYGON)-1]                            # high end tuple
+                if STEP > xdata:                                                     # extrapolate backwards
+                    (STEPt, sValt) = POLYGON[1]                                     # second tuple
+                    lowVal = sVal
+                    topVal = sValt
+                    lowX= STEP
+                    myX = xdata
+                    topX= STEPt
+                    newVal = lowVal + (topVal-lowVal)/(topX-lowX)*(myX-lowX)
+                elif STEPt < xdata:                                                  # extrapolate forwards
+                    (STEP, sVal) = POLYGON[len(POLYGON)-2]                        # last but 1 tuple
+                    lowVal = sVal
+                    topVal = sValt
+                    lowX= STEP
+                    myX = xdata
+                    topX= STEPt
+                    newVal = lowVal + (topVal-lowVal)/(topX-lowX)*(myX-lowX)
+                else:                                                               # interpolate inside range
+                    for i in range(len(POLYGON)):
+                        (STEP, sVal) = POLYGON[i]
+                        if STEP == xdata:
+                            newVal = sVal   #POLYGON[STEP]
+                            break
+                        elif STEP > xdata:
+                            topVal = sVal
+                            lowX= lowLabl
+                            myX = xdata
+                            topX= STEP
+                            newVal = lowVal + (topVal-lowVal)/(topX-lowX)*(myX-lowX)
+                            break
+                        lowVal = sVal 
+                        lowLabl= STEP
+                myVal = myVal[:woPOLYGON] + str(newVal) + myVal[woPOLYGON+7+len(xstr)+2:]
+
             logmsg = 'appended new entry to'
             validRow = True
             if   myArray == 'autosens_data' :
@@ -402,9 +465,6 @@ def setVariant(stmp):
                     logmsg = 'edited old value of '+str(temp[myItem])+' in'
                 temp[myItem] = eval(myVal)
                 logres = str(temp[myItem])
-            elif myArray == 'STAIR' :
-                STAIR[myItem] = eval(myVal)
-                logres = myVal
             elif myArray == 'new_parameter' :                                       # allow also string type assignments like "<V2.7"
                 if myItem in new_parameter :
                     logmsg = 'edited old value of '+str(new_parameter[myItem])+' in'
@@ -415,14 +475,27 @@ def setVariant(stmp):
                 logres = str(new_parameter[myItem])
             elif myArray == 'STAIR' :
                 STAIR[myItem] = eval(myVal)
+                logres = myVal
+            elif myArray == 'STAIR_BAS' :
+                STAIR_BAS[myItem] = eval(myVal)
+                logres = myVal
+            elif myArray == 'STAIR_CR' :
+                STAIR_CR[myItem] = eval(myVal)
+                logres = myVal
+            elif myArray == 'STAIR_ISF' :
+                STAIR_ISF[myItem] = eval(myVal)
+                logres = myVal
             elif myArray == 'INTERPOL' :
-                if len(myItem) < 24:                                                # incomplete UTC time label
+                if len(myItem) < 24:                                          # incomplete UTC time label
                     oldLen = len(myItem)
                     if myItem[oldLen-1:] == 'Z':
                         oldLen += -1
                         myItem = myItem[:-1]
                     myItem = myItem + '00:00:00.000Z'[oldLen-11:]
                 INTERPOL.append((myItem, eval(myVal)) )
+                logres = myVal
+            elif myArray == 'POLYGON' :
+                POLYGON.append((eval(myItem), eval(myVal)) )
                 logres = myVal
             else:
                 validRow = False
@@ -457,12 +530,12 @@ def getOrigPred(predBGs):
 
 def TreatLoop(Curly, log, lcount):
     global SMBreason, newLoop
-    global loop_mills, loop_label
+    global loop_mills, loop_label, bgTimeMap
     global origInsReq
     global origSMB, emulSMB
     global origMaxBolus, emulMaxBolus
     global origBasal, lastBasal
-    global longDelta, avgDelta, longSlope, rateSlope, glucose_status, origISF, emulISF, origAI_ratio, emulAI_ratio
+    global longDelta, avgDelta, longSlope, rateSlope, glucose_status, origISF, BZ_ISF, Delta_BZ, emulISF, origAI_ratio, emulAI_ratio
     global Pred, FlowChart, Fits
     #print('\nentered TreatLoop for row '+str(lcount)+' ending with  /'+Curly[-1]+'/ having '+Curly[780:800]+'\n'+Curly)
     wo_apo = Curly.find("\'")
@@ -475,8 +548,13 @@ def TreatLoop(Curly, log, lcount):
         return 'MORE'       
     smb = json.loads(Curly)
 
-    if 'openaps' in smb:                                            # otherwise unknown source of entry
+    if 'openaps' in smb and 'reason' in smb['openaps']['suggested']:# otherwise unknown source of entry
         suggest = smb['openaps']['suggested']
+        go_on = True
+    elif 'insulinReq' in smb:
+        suggest = smb                                               # AAPS V3 does not have longer NS DBADD log
+        go_on = True
+    if go_on :
         #thisTime = int(round(time.time() * 1000))                  # use as now() or the emulated execution time
         if 'deliverAt' in suggest:
             stmp = suggest['deliverAt']                             # the SMB mode from oref1
@@ -497,6 +575,7 @@ def TreatLoop(Curly, log, lcount):
         loop_mills.append(round(thisTime/1000, 1) )                 # from millis to secs
         loop_label.append(stmp[11:19] + stmp[-1])                   # include seconds to distinguish entries
         #print('len loop_mills='+str(len(loop_mills))+'; len labels='+str(len(loop_label)))
+        bgTimeMap[loop_mills[-1]] = bgTime[-1]                      # bgTime used by loop at thisTime
         if 'insulinReq' in suggest:
             key = 'insulinReq'
             ins_Req = suggest[key]
@@ -517,7 +596,7 @@ def TreatLoop(Curly, log, lcount):
         if maxBol== '' :    maxBol= '0'
         origSMB.append(eval(mySMB))
         origMaxBolus.append(eval(maxBol))
-        log.write('\n========== DELTA in row ' + str(lcount) + ' SMB ========== of logfile '+fn+'\n')
+        log.write('\n========== orig loop in row ' + str(lcount) + ' ========== of logfile '+fn+'\n')
         log.write('  created at= ' + stmp + '\n')
         log.write(SMBreason['script'])                              # the script debug section
         #printVal(suggest, 'bg', log)
@@ -531,7 +610,7 @@ def TreatLoop(Curly, log, lcount):
             SMBreason = {}                                              # clear for first filtered debug list
             SMBreason['script'] = '---------- Script Debug --------------------\n'
             return 'MORE'       
-        tempReq = basalFromReason(smb, lcount)
+        tempReq = basalFromReason(suggest, lcount)
         origBasal.append(round(eval(tempReq), 4))
         
         # now we can set the remaining iob data section
@@ -543,6 +622,8 @@ def TreatLoop(Curly, log, lcount):
             SMBreason['lastTempAge'] = 0                                    # most frequent value as my best case
             SMBreason['origISF'] = profile['sens']                          # take from profile
             Fcasts = {}
+            #Fcasts['BZ_ISF'] = profile['sens'] 
+            #Fcasts['Delta__ISF'] = profile['sens'] 
             Fcasts['emulISF'] = profile['sens'] 
         else:
             origcob.append(round(suggest['COB'], 1))
@@ -565,7 +646,7 @@ def TreatLoop(Curly, log, lcount):
         tempBasalFunctionsDummy = ''                    # is handled inside determine_basal as import
         origInsReq.append(ins_Req)
         origISF.append(SMBreason['origISF'])
-        varlog.write('\nloop execution in row='+str(lcount)+' of logfile '+fn+' at= ' + smb['created_at'] + '\n')
+        varlog.write('\nloop execution in row='+str(lcount)+' of logfile '+fn+' at= ' + stmp + '\n')
         #longDelta.append(round(glucose_status['long_avgdelta'],2))
         delta05, avg05 = getHistBG(len(bg)-1, 0.05)
         glucose_status['dura05'] = delta05              # for the time being keep name from 1ast attempt
@@ -573,7 +654,7 @@ def TreatLoop(Curly, log, lcount):
         longDelta.append(round(delta05, 2))
         avgDelta.append(round(avg05, 2))
         if delta05<100 or True:                         # no risk of singularity, get linear regression; restriction not needed?
-            dura70, slope70, slopes = getSlopeBG(len(bg)-1)
+            dura70, slope70, slopes, iMax = getSlopeBG(len(bg)-1)
             glucose_status['dura70'] = dura70
             glucose_status['slope70'] = slope70
             longSlope.append(round(dura70, 2))
@@ -593,10 +674,10 @@ def TreatLoop(Curly, log, lcount):
         
         #if profile['new_parameter']['bestParabola']:       dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
         
-        reT = detSMB.determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, True, reservoir, thisTime, Fcasts, Flows, emulAI_ratio)
+        reT = detSMB.determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, MicroBolusAllowed, reservoir, thisTime, Fcasts, Flows, emulAI_ratio)
         newLoop = False
         if len(origAI_ratio)<len(emulAI_ratio):
-            origAI_ratio.append(10.0)                    # not found in original console_error
+            origAI_ratio.append(10.0)                   # not found in original console_error
         reason = echo_rT(reT)                           # overwrite the original reason
         maxBolStr = getReason(reason, 'maxBolus', '. ', 1)
         if len(maxBolStr) > 5 :
@@ -606,6 +687,11 @@ def TreatLoop(Curly, log, lcount):
         mySMBstr = getReason(reason, 'Microbolusing', 'U',  1)
         if mySMBstr == '' :     mySMBstr = '0'
         emulSMB.append(round(eval(mySMBstr),1))
+        BZ_ISF.append(Fcasts['BZ_ISF'])                 # was set in determine_basal.py
+        Delta_ISF.append(Fcasts['Delta_ISF'])           # was set in determine_basal.py
+        pp_ISF.append(Fcasts['pp_ISF'])                 # was set in determine_basal.py
+        acceISF.append(Fcasts['acceISF'])               # was set in determine_basal.py
+        dura_ISF.append(Fcasts['dura_ISF'])             # was set in determine_basal.py
         emulISF.append(Fcasts['emulISF'])               # was set in determine_basal.py
 
         if reason.find('COB: 0,') == 0: 
@@ -666,12 +752,8 @@ def PrepareSMB(zeile, log, lcount):
         isf_end = what.find(' CSF:')
         SMBreason['origISF'] = eval(what[isf_anf+6:isf_end])
         #print (str(lcount), str(origISF))
-    elif what.find('more aggressive') >0:               # redefined original from autoISF
-        isf_anf = what.find('more aggressive')
-        origAI_ratio.append(eval(what[isf_anf+18:])*10)
-        SMBreason['origISF'] = eval(what[isf_anf+18:])
-        #print (str(lcount), str(origISF))
-        
+    elif what.find('final ISF factor is') ==0:          # result of autoISF
+         origAI_ratio.append(eval(what[20:])*10)
     pass
 
 def featured(Option):
@@ -685,19 +767,31 @@ def featured(Option):
 def get_glucose_status(lcount, st) :                    # key = 80
     Curly = st[16:]
     global glucose_status
-    global bg, bgTime
+    global bg, bgTime, deltas
     global newLoop
     newLoop = True
-    #print('entered glucose_status for row '+str(lcount)+' with\n'+Curly)
     glucose_status = json.loads(Curly)
     glucose_status['row'] = lcount
+    #print('entered glucose_status for row='+str(lcount)+'  loop_mills='+'loop_mills[-1]' + '  total count='+str(len(bg))+' with\n '+Curly)
+    #print('entered glucose_status for row='+str(lcount)+'  total mills='+str(len(loop_mills))+ '  total BGs='+str(len(bg))+' with\n '+Curly)
     if len(bg)==len(loop_mills) :
         bg.append(glucose_status['glucose'])            # start next iteration
-        bgTime.append(glucose_status['date']/1000)      # time of bg value in seconds; was minutes
+        mills = glucose_status['date']/1000             # time of bg value in seconds; was milliseconds
+        #bgTime.append(mills)                            # time of bg value in seconds; was minutes
+        for i in range(100):                            # in case rth elp is executed 100 times before next CGM
+            mills += 0.0001
+            if mills not in deltas:    break            # use bg_time with very small offset
+        bgTime.append(mills)                            # time of bg value in seconds; was minutes
+        deltas[mills] = {'bg':glucose_status['glucose'], 'delta':glucose_status['delta'], 'short':glucose_status['short_avgdelta'], 'long':glucose_status['long_avgdelta']}
+        if 'parabola_fit_minutes' in glucose_status:
+            deltas[mills]['parabola_fit_minutes']    = glucose_status['parabola_fit_minutes']
+            deltas[mills]['parabola_fit_correlation']= glucose_status['parabola_fit_correlation']
+            deltas[mills]['parabola_fit_last_delta'] = glucose_status['parabola_fit_last_delta']
+            deltas[mills]['parabola_fit_next_delta'] = glucose_status['parabola_fit_next_delta']
     else:
         bg[-1] = (glucose_status['glucose'])            # overwrite as last loop was not finished
         bgTime[-1] = (glucose_status['date']/1000)      # time of bg value in seconds; was minutes
-    #print ('\nbg data found in row '+str(lcount)+', total count='+str(len(bg))
+        #print ('\nbg data found in row '+str(lcount)+', total count='+str(len(bg)))
     pass
 
 def get_iob_data(lcount, st, log) :                     # key = 81
@@ -804,6 +898,13 @@ def get_autosens_data(lcount, st) :                     # key = 86
         autoISF[-1] = (profile['sens'] / autosens_data['ratio'])    # ISF assigned now as autosense is the last data block
     pass
 
+def get_MicroBolusAllowed(lcount, st) :                 # key = 90
+    if not newLoop: return
+    global MicroBolusAllowed
+    #Curly = st[16:]
+    MicroBolusAllowed = (st.find('true') > 16)
+    pass
+
 def ConvertSTRINGooDate(stmp) :
     # stmp is datetime string incl millis, i.e. like "2019-05-22T12:06:48.091Z"
     if   stmp < "2019-10-27T03:00:00.000Z":
@@ -814,8 +915,12 @@ def ConvertSTRINGooDate(stmp) :
          dlst = 3600                                 #    dlst period summer 2020
     elif stmp < "2021-03-28T02:00:00.000Z":
          dlst =    0                                 # no dlst period winter 2020/21
-    else:
+    elif stmp < "2021-10-31T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2021
+    elif stmp < "2022-03-27T02:00:00.000Z":
+         dlst =    0                                 # no dlst period winter 2021/22
+    else:
+         dlst = 3600                                 #    dlst period summer 2022
     MSJahr		= eval(    stmp[ 0:4])
     MSMonat		= eval('1'+stmp[ 5:7]) -100
     MSTag		= eval('1'+stmp[ 8:10])-100
@@ -853,9 +958,10 @@ def scanLogfile(fn, entries):
         dataType_offset = -999                  # AAPS version not yet known
         AAPS_Version = '<2.7'
         #fn_base=      fn + '.' + varLabel
-        xyf     = open(fn_first + '.' + varLabel + '.tab', 'w')
-        varlog  = open(fn_first + '.' + varLabel + '.log', 'w')
+        xyf     = open(fn_first + '.' + varLabel + '.csv', 'w')
         log     = open(fn_first + '.orig.txt', 'w')
+        varlog  = open(fn_first + '.' + varLabel + '.log', 'w')
+        varlog.write(echo_msg)
     varlog.write('\n========== Echo of what-if definitions actioned for variant '+varLabel+'\n========== created on '+formatdate(localtime=True) + '\n========== for loop events found in logfile '+fn+'\n')
     log.write('AAPS scan from AAPS Logfile for SMB comparison created on ' + formatdate(localtime=True) + '\n')
     log.write('FILE='+fn + '\n')
@@ -893,12 +999,12 @@ def scanLogfile(fn, entries):
                     Block2 = hole(sLine, 1+sOffset, '[', ']')
                     if Block2 == '[DataService.onHandleIntent():54]' \
                     or Block2 == '[DataService.onHandleIntent():55]' \
-                    or Block2 == '[DataService.onHandleIntent():69]':             # token :54 added for AAPS versions <2.7, :69 for V2.7
+                    or Block2 == '[DataService.onHandleIntent():69]':               # token :54 added for AAPS versions <2.7, :69 for V2.7
                         pass
-                    elif Block2[:-3] == '[DetermineBasalAdapterAMAJS.invoke():':  # various input items for loop
+                    elif Block2[:-3] == '[DetermineBasalAdapterAMAJS.invoke():':    # various input items for loop
                         log_msg('\nSorry, this tool is currently only available for oref1 with SMB\n')
                         return 'STOP'
-                    elif Block2.find('[DetermineBasalAdapterSMBJS.invoke():')==0: # loop inputs or result record
+                    elif Block2.find('[DetermineBasalAdapterSMBJS.invoke():')==0:   # loop inputs or result record
                         key_anf = Block2.find('):')
                         key_end = Block2.find(']:')
                         dataType= eval(Block2[key_anf+2:key_end])
@@ -922,6 +1028,7 @@ def scanLogfile(fn, entries):
                             #elif dataType == 110:   pass                    # V 2 7:     CurrentTime: 1604776609511
                             #elif dataType != 163:   print('unhandled dataType:', str(dataType), 'row', str(lcount), 'of file',fn) # any but 2.7 RESULT
                             #version_set = True                              # keep until next logfile is loaded
+                            pass
                         #elif Block2[:-4] == '[DetermineBasalAdapterSMBJS.invoke():':  # various input items for loop
                         #print (str(lcount), str(dataType), str(dataType_offset), dataTxt + dataStr[17:60])
                         if   dataTxt[:16] == 'RhinoException: ' :           code_error(lcount, dataStr)
@@ -931,20 +1038,35 @@ def scanLogfile(fn, entries):
                         elif dataTxt      == 'Profile:        {' :          get_profile(lcount, dataStr)
                         elif dataTxt      == 'Meal data:      {' :          get_meal_data(lcount, dataStr)
                         elif dataTxt      == 'Autosens data:  {' :          get_autosens_data(lcount, dataStr)
-                        elif dataTxt      == 'Result: {"temp":"' :          checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.6.1
+                        elif dataTxt      == 'MicroBolusAllowed' :          get_MicroBolusAllowed(lcount, dataStr)
+                        elif dataTxt      == 'Result: {"temp":"' :
+                                                                            checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.6.1
+                                                                            cont = TreatLoop(dataStr[8:], log, lcount)
+                                                                            if cont=='STOP' or cont=='SYNTAX':     return cont
                         #elif dataType == dataType_offset+145:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.7
                         #elif dataType == dataType_offset+147:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 Wolfgang Spänle
                         #elif dataType == dataType_offset+146:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 / Phillip
+                        pass
                     elif Block2 == '[LoggerCallback.jsFunction_log():39]' \
-                    or   Block2 == '[LoggerCallback.jsFunction_log():42]':  # script debug info from console.error; '42:' is for >= V2.7
+                    or   Block2 == '[LoggerCallback.jsFunction_log():42]' \
+                    or   Block2 == '[LoggerCallback.jsFunction_log():21]':          # from console.error; '42' is for >= V2.7, '21' for V3
                         PrepareSMB(sLine, log, lcount)   
-                    elif Block2 == '[DbLogger.dbAdd():29]':                 ################## flag for V2.5.1
+                    elif Block2 == '[DbLogger.dbAdd():29]':                             ################## flag for V2.5.1
                         Curly =  hole(sLine, 1+sOffset+len(Block2), '{', '}')
                         #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
                         if Curly.find('{"device":"openaps:')==0:   
                             cont = TreatLoop(Curly, log, lcount)
                             if cont=='STOP' or cont=='SYNTAX':     return cont
-                elif zeile.find('data:{"device":"openaps:') == 0 :          ################## flag for V2.6.1
+                    elif zeile.find('[NSClientPlugin.onStart$lambda-5():124]') > 0 :    ################## flag for V3.0dev
+                        Curly =  hole(zeile, 5, '{', '}')
+                        #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
+                        #if  Curly.find('{"device":"openaps:')==0 \
+                        #and Curly.find('"openaps":{"suggested":{')>0 :
+                        if  Curly.find('"openaps":{"suggested":{')>0 :
+                            #and 'lastTempAge' in SMBreason :   
+                            cont = TreatLoop(Curly, log, lcount)
+                            if cont=='STOP' or cont=='SYNTAX':     return cont
+                elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
                     #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
                     if  Curly.find('{"device":"openaps:')==0 \
@@ -1059,7 +1181,7 @@ def getDeltaBG(slopes, duration):
 def getSlopeBG(iFrame):
     # linerar regression analysis after 
     # http://www.carl-engler-schule.de/culm/culm/culm2/th_messdaten/mdv2/auszug_ausgleichsgerade.pdf
-    if iFrame < 2:         return 0,0, {}   # first 2 points make a trivial line
+    if iFrame < 2:         return 0,0, {}, -1   # first 2 points make a trivial line
 
     corrMin = 0.70                          # go backwards until the correlation coefficient goes below
     sumBG   = 0                             # y
@@ -1095,11 +1217,11 @@ def getSlopeBG(iFrame):
                     slope70 = b * 5 * 60       # 5 minute slope at best correlation
                 slopes[i] = slopePar
             #print ('some fit', str(n-1), str(b), str(a),str(r_sq))
-    if corrMax == 0:         return 0,0, slopes   # no good correlation found
+    if corrMax == 0:         return 0,0, slopes, -1   # no good correlation found
     #print('found these deltas')
     #for i in slopes:    print(str(i), str(slopes[i]))
     #print('selected deltas are', str(getDeltaBG(slopes,7.5)), str(getDeltaBG(slopes,17.5)), str(getDeltaBG(slopes,42.5)))
-    return round(dura70,0), round(slope70,1), slopes
+    return round(dura70,0), round(slope70,1), slopes, iMax
     
 def getBestParabolaBG(iFrame):
 ## nach https://goodcalculators.com/quadratic-regression-calculator/
@@ -1111,32 +1233,38 @@ def getBestParabolaBG(iFrame):
 ##  y = a2*x^2 + a1*x + a0      or      
 ##  y = a*x^2  + b*x  + c       respectively
 
-    if iFrame < 3:  return 0,0, {}, -1    # first 3 points make a trivial parabola
-
-    corrMin = 0.90                        # go backwards until the correlation coefficient goes below
-    sy    = 0                             # y
-    sx    = 0                             # x
-    sx2   = 0                             # x^2
-    sx3   = 0                             # x^3
-    sx4   = 0                             # x^4
-    sxy   = 0                             # x*y
-    sx2y  = 0                             # x^2*y
+    if iFrame < 3:  return 0,0, {}, -1      # first 3 points make a trivial parabola
+    
+    corrMin = 0.90                          # go backwards until the correlation coefficient goes below
+    sy    = 0                               # y
+    sx    = 0                               # x
+    sx2   = 0                               # x^2
+    sx3   = 0                               # x^3
+    sx4   = 0                               # x^4
+    sxy   = 0                               # x*y
+    sx2y  = 0                               # x^2*y
     parabs  = {}
     corrMax = 0
     sum_of_squares = 0
+    # for best numerical accurarcy time and bg must be of same order of magnitude
+    global scaleTime, scaleBg
+    scaleTime =   1                         # in sec; values are 0, 300, 600, 900, 1200, ... while testing
+    scaleTime = 300                         # in 5m; values are  0,   1,   2,   3,    4, ...
+    scaleBg   =   1                         # TIR range is now  70 - 180                 ... while testing
+    scaleBg   =  50                         # TIR range is now 1.4 - 3.6
 
     for i in range(iFrame, -1, -1):
         #if bgTime[iFrame] - bgTime[i] > 45*60:      break              # range not longer than 45m
-        ti     = bgTime[i] -bgTime[iFrame]         # time offset to make the numbers smaller for numerical accuracy
-        if -ti > 45*60:      break                                              # range not longer than 45m
+        ti     = (bgTime[i] -bgTime[iFrame])/scaleTime      # time offset to make the numbers smaller for numerical accuracy
+        if -ti*scaleTime > 45*60:      break                # range not longer than 45m
 
         sx    += ti
         sx2   += pow(ti, 2)
         sx3   += pow(ti, 3)
         sx4   += pow(ti, 4)
-        sy    +=              bg[i]
-        sxy   += ti         * bg[i]
-        sx2y  += pow(ti, 2) * bg[i]
+        sy    +=              bg[i]/scaleBg
+        sxy   += ti         * bg[i]/scaleBg
+        sx2y  += pow(ti, 2) * bg[i]/scaleBg
         n = iFrame - i + 1
         #print (str(sx), str(sy), str(sxy), str(sx2), str(sx3), str(sx4), str(sx2y))
         if n<=3:
@@ -1160,28 +1288,30 @@ def getBestParabolaBG(iFrame):
             s_squares = 0
             s_residual_squares = 0
             for j in range(i, iFrame+1):
-                s_squares          += (bg[j] - y_mean)**2
-                s_residual_squares += (bg[j] - (a*(bgTime[j]-bgTime[iFrame])**2 + b*(bgTime[j]-bgTime[iFrame]) + c))**2
+                s_squares          += (bg[j]/scaleBg - y_mean)**2
+                bg_j                = a*((bgTime[j]-bgTime[iFrame])/scaleTime)**2 + b*(bgTime[j]-bgTime[iFrame])/scaleTime + c
+                s_residual_squares += (bg[j]/scaleBg - bg_j)**2
+                #print('a='+str(a), 'b='+str(b), 'c='+str(c), 'bg_j='+str(bg_j))
 
             if s_squares == 0.0:
                 #print (loop_label[iFrame], 'has', str(s_residual_squares), 'in subloop', str(i))
                 r_sq = 0.64
             else:
                 r_sq = 1 - s_residual_squares/s_squares
-            #print('y_mean='+str(y_mean), '  R2='+str(r_sq))
+                #print('y_mean='+str(y_mean), ' squ='+str(s_squares), ' res='+str(s_residual_squares), ' R2='+str(r_sq))
             
-            dur     = -ti/60    #(bgTime[iFrame]-bgTime[i])/60
+            dur     = -ti*scaleTime/60    #(bgTime[iFrame]-bgTime[i])/60
             #print(loop_label[i], 'with', str(n), 'elements has   a =', str(a),' b=', str(b), ' c=', str(c))
             #print (i, loop_label[i], str(bgTime[i]), str(bg[i]), str(dur))
             #if r_sq < corrMin :      break  # correlation too bad 
 
             if i<=iFrame-2:      
-                if r_sq>0:   parabs[i] = dict(n=n-1, a2=a, a1=b, a0=c, corr=r_sq, dur=dur)
+                if r_sq>0:   parabs[i] = dict(n=n-1, a2=a*scaleBg, a1=b*scaleBg, a0=c*scaleBg, corr=r_sq, dur=dur)
                 if r_sq>corrMax:
                     corrMax = r_sq
                     iMax = i
                     dura_p  = dur   #( loop_mills[iFrame] - loop_mills[i] ) / 60
-                    delta_p = a*(pow(loop_mills[i]-loop_mills[iFrame]+5*60,2) - pow(loop_mills[i]-loop_mills[iFrame],2)) + b*(5*60-0)     # 5 minute slope to next forecast
+                    delta_p = scaleBg*( a*(pow(5*60/scaleTime,2)) + b*(5*60/scaleTime) )    # 5 minute slope to next forecast
             #print ('some fit', str(n-1), str(b), str(a),str(r_sq))
     if corrMax == 0:         return 0,0, parabs, -1   # no good correlation found
     #print('found these parabolas for time', loop_label[iFrame])
@@ -1203,7 +1333,7 @@ def XYplots(loopCount, head1, head2, entries) :
     from matplotlib.backends.backend_pdf import PdfPages
     global yStep, yRange, thickness
     # ---   ensure that last loop was finished  -------------
-    if len(loop_mills) < len(bg)            :   bg.pop()
+    #f len(loop_mills) < len(bg)            :   bg.pop()            # bg  has its own vectors
     if len(loop_mills) < len(origTarLow)    :   origTarLow.pop()
     if len(loop_mills) < len(origTarHig)    :   origTarHig.pop()
     if len(loop_mills) < len(origInsReq)    :   origInsReq.pop()
@@ -1253,7 +1383,7 @@ def XYplots(loopCount, head1, head2, entries) :
     cob_area.append(0)                      #  close polygon at top left corner
     iob_area.append(0)                      #  close polygon at top left corner
     looparea.append(loop_mills[0])
-        
+
     # ---   plot the comparisons    -------------------------
     if loopCount   <= 30 :                                                                # step size for y-axis (time)
         yStep =  3      # every 15 minutes
@@ -1261,8 +1391,10 @@ def XYplots(loopCount, head1, head2, entries) :
         yStep =  6      # every 30 minutes
     elif loopCount <=120:
         yStep = 12      # every 60 minutes
+    elif loopCount <=480:
+        yStep = 48      # every 4 hours
     else :
-        yStep = 24      # every 120 minutes
+        yStep = 96      # every 8 hours
     yTicks = []
     yLabels= []
     
@@ -1288,7 +1420,7 @@ def XYplots(loopCount, head1, head2, entries) :
     frameIns = featured('insReq') or featured('maxBolus') or featured('SMB') or featured('basal')
     if frameIns :                                                                       # we need frame for insulin type graph(s)
         maxPlots += 1
-    frameBG = featured('bg') or featured('target') or featured('pred') or featured('as ratio') or featured ('cob') or featured('iob') or featured('activity')
+    frameBG = featured('bg') or featured('target') or featured('pred') or featured('as ratio') or featured('autoISF') or featured('ISF') or featured ('cob') or featured('iob') or featured('activity')
     if frameBG :                                                                        # we need frame for bg type graph(s)
         bgOffset = maxPlots
         maxPlots += 2
@@ -1326,7 +1458,7 @@ def XYplots(loopCount, head1, head2, entries) :
 
     with PdfPages(pdfFile) as pdf:
         for iFrame in range(0, maxframes):                                              # the loop instances
-            log_msg(entries[loop_mills[iFrame]])                                        # print short table as heart beat
+            log_msg(entries[loop_mills[iFrame]].replace('.', my_decimal))                      # print short table as heart beat
             #fig, axes = plt.subplots(1, maxPlots, constrained_layout=True, figsize=(9, 15)) #6*maxPlots)  )          
             fig = plt.figure(constrained_layout=True, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
             #fig = plt.figure(constrained_layout=False, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
@@ -1367,12 +1499,13 @@ def XYplots(loopCount, head1, head2, entries) :
                 axbg.tick_params(axis='x', colors='red')
                 axbg.set_xlabel('...IOB...COB...Activity...Autosense...ISF...Targets...Glucose...', weight='bold')
                 if frameIns:                                                            # already annotated in insulin frame
-                    axbg.set_yticklabels(['',''])                                       # dummy axis labels
+                    #axbg.set_yticklabels(['',''])                                      # dummy axis labels; lately problems
                     axbg.set_yticks([-1,9e99])                                          # off scale to suppress ticks
                 else:                                                                   # not yet annotated in insulin frame
                     axbg.set_yticks(yTicks)
                     axbg.set_yticklabels(yLabels)
                 axbg.set_ylim(loop_mills[-1]+thickness*2, loop_mills[0]-thickness*2)
+                #axbg.set_xlim(0, 250)                                                  # no effect on squeezing for bg>250 !!
 
                 if featured('target') :                                                 # plot targets
                     axbg.plot(emulTarHig, loop_mills, linestyle='None',   marker='o', color='black',  label='target high, emulated')
@@ -1381,22 +1514,16 @@ def XYplots(loopCount, head1, head2, entries) :
                     axbg.plot(origTarLow, loop_mills, linestyle='dashed', marker='.', color='yellow', label='target  low, original')
 
                 if featured('bg') :                                                     # plot bg
-                    axbg.plot(bg,         loop_mills, linestyle='solid',  marker='o', color='red',    label='blood glucose')
+                    axbg.plot(bg,         bgTime,     linestyle='solid',  marker='o', color='red',    label='blood glucose')
                     dura05, avg05 = getHistBG(iFrame, 0.05)                             # mins in 5% band
                     if dura05>1 and featured('range'):
                         bg_min = avg05 * (1-0.05)
                         bg_max = avg05 * (1+0.05)
                         minmills = loop_mills[iFrame] - dura05 * 60
                         axbg.fill_between([bg_min,bg_max], minmills-2*thickness, loop_mills[iFrame]+2*thickness, fc='red', alpha=0.25)
-                    #dura10, avg10 = getHistBG(iFrame, 0.10)                            # mins in 10% band no longer of interest
-                    #bg_min = avg10 * (1-0.10)
-                    #bg_max = avg10 * (1+0.10)
-                    #minmills = loop_mills[iFrame] - dura10 * 60
-                    #if dura10>1:
-                    #    axbg.fill_between([bg_min,bg_max], minmills-2*thickness, loop_mills[iFrame]+2*thickness, fc='red', alpha=0.1)
-                    if iFrame>1 and featured('slope'):                                  # show fit(s)
-                        dura70, slope70, slopes = getSlopeBG(iFrame)
-                        corrMax = 0
+                    if iFrame>1 and ( featured('fitsslope') or featured('bestslope')):  # show all fits
+                        dura70, slope70, slopes, iMax = getSlopeBG(iFrame)
+                        first_linear_fit = True
                         for i in slopes:
                             #print ('iFrame', str(iFrame), ' mit', str(i), 'hat', str(slopes[i]))
                             a = slopes[i]['a']
@@ -1405,23 +1532,19 @@ def XYplots(loopCount, head1, head2, entries) :
                             t2= bgTime[iFrame]
                             b1= b*t1+a
                             b2= b*t2+a
-                            #print(str(i), str(loop_mills[i]), str(bgTime[i]), str(bg[i]))
-                            axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color='#c0c0c0')#all the fits
-                            r_sq = slopes[i]['corr']
-                            if r_sq>corrMax:
-                                corrMax = r_sq
-                                iMax = i
-                        if corrMax > 0:
-                            i = iMax                                                    # index of best fit
-                            a = slopes[i]['a']
-                            b = slopes[i]['b']
-                            t1= bgTime[i]
-                            t2= bgTime[iFrame]
-                            b1= b*t1+a
-                            b2= b*t2+a
-                            axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color='black', label='linear regression')   #best fit
+                            fitcolor = ['#c0c0c0',  'black']                            # grey, black
+                            isBest = ( i==iMax)
+                            if not isBest and featured('fitsslope'):
+                                if first_linear_fit:
+                                    axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='any linear fit')#all the fits
+                                    first_linear_fit = False
+                                else:
+                                    axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest])                     #all the fits
+                            if isBest and featured('bestslope'):
+                                axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='best linear fit')   #best fit
                     if iFrame>2 and (featured('bestParabola') or featured('fitsParabola')): # show parabolas
                         dura_p, delta_p, parabs, iMax = getBestParabolaBG(iFrame)
+                        first_parabola_fit = True
                         for i in parabs:
                             #print('  plotting', str(parabs[i]))
                             a2 = parabs[i]['a2']
@@ -1430,23 +1553,30 @@ def XYplots(loopCount, head1, head2, entries) :
                             dur= parabs[i]['dur']
                             bfit = []
                             tfit = []
-                            if i == iMax:
-                                fitcolor = 'black'
-                            else:
-                                fitcolor = '#808080'                                    # darker than previus c0c0c0
-                            tx = bgTime[iFrame] +5*60                               # window end time = +5min from now
+                            fitcolor = ['#ff00ff',  '#900090']                          # faint violett = magenta, dark violett
+                            isBest = ( i==iMax)
+                            tx = bgTime[iFrame] +5*60                                   # window end time = +5min from last glucose
+                            #if a2 != 0:
+                            #    tminmax = -a1/(2*a2)+5*60                               # time of min or max +5min
+                            #    tx = max(tx, tminmax)                                   # if min/max is ahead of bgTime
                             while tx >= bgTime[iFrame]-dur*60:
-                                ti = tx - bgTime[iFrame]
+                                ti = (tx - bgTime[iFrame])/300
                                 bfit.append(a2*pow(ti,2) + a1*ti + a0)
-                                tfit.append((ti+bgTime[iFrame])*1)
+                                tfit.append(tx)
                                 #print('interim', str(i), str(tfit), str((bfit)))
                                 tx += -2.5*60                                           # go  backwards in fit window
-                            if i != iMax and featured('fitsParabola'):
-                                axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor)   # some Parabola
-                                axbg.plot([bfit[0],bfit[0]], [tfit[0],tfit[0]], marker='o', color=fitcolor)   #  bulls eye of some forecast
-                            if i == iMax and featured('bestParabola'):
-                                axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor)   #  best Parabola
-                                axbg.plot([bfit[0],bfit[0]], [tfit[0],tfit[0]], marker='o', color=fitcolor)   #  bulls eye of best forecast
+                            if not isBest and featured('fitsParabola'):
+                                axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])   # some Parabola
+                                if first_parabola_fit:
+                                    axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='any parabola fit')     # some other Parabola
+                                    first_parabola_fit = False
+                                else:
+                                    axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest])     # some other Parabola
+                                axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest])     # some other Parabola
+                            if isBest and featured('bestParabola'):
+                                axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])    #  best Parabola
+                                axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='best parabola fit') #  bulls eye of newest forecast
+                                axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest]) #  bulls eye of oldest forecast
                         
                 if featured('as ratio') :                                               # plot autosense ratio
                     axbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='Autosense(x10) OFF')
@@ -1599,7 +1729,7 @@ def XYplots(loopCount, head1, head2, entries) :
                         predZT = Fcasts['ZTpredBGs']
                         axbg.plot(origZT,  fcastmills[:len(origZT)],  linestyle='solid',            color=colFav['ZT'],  label='predZT, original')
                         axbg.plot(initZT,  fcastmills[:len(initZT)],  linestyle='None', marker='.', color=colFav['ZT'],  fillstyle='none')
-                        axbg.plot(predZT,  fcastmills[:len(predZT)],  linestyle='None', marker='.', Color=colFav['ZT'],  label='predZT, emulated')
+                        axbg.plot(predZT,  fcastmills[:len(predZT)],  linestyle='None', marker='.', color=colFav['ZT'],  label='predZT, emulated')
                     else:
                         axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['ZT'],  label='no ZT  active') # inactive
                     
@@ -1607,12 +1737,12 @@ def XYplots(loopCount, head1, head2, entries) :
             
             if frameFlow :                                                              # anything related to flow chart
                 axfl = fig.add_subplot(gs[0, flowOffset:])
-                axfl.set_xticklabels(['',''])                                           # dummy axis labels
                 axfl.set_xticks([-99,99999])                                            # off scale to suppress ticks
                 axfl.set_xlim(10, 200)
-                axfl.set_yticklabels(['',''])                                           # dummy axis labels
+                axfl.set_xticklabels(['',''])                                           # dummy axis labels
                 axfl.set_yticks([-99999,99])                                            # off scale to suppress ticks
                 axfl.set_ylim(-700, 0)
+                axfl.set_yticklabels(['',''])                                           # dummy axis labels
                 axfl.set_xlabel('Flowchart and decision logic at time ' + loop_label[iFrame], weight='bold')
                  
                 thisTime = loop_mills[iFrame]
@@ -1669,24 +1799,24 @@ def XYplots(loopCount, head1, head2, entries) :
             pdf.savefig()
             if not featured('pred'):                        # only 1 frame
                 for i in range(iFrame+1,  len(entries)):
-                    log_msg(entries[loop_mills[i]])
+                    log_msg(entries[loop_mills[i]].replace('.', my_decimal))
                 if how_to_print != 'GUI':    plt.show()     # otherwise conflict with root.mainloop() in tkinter
             plt.close()                                     # end of current page
         #pdf.close()                                        # not needed due to "with ..." method triggered above
     pass
 
-def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries):
-    #log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile)
+def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries, msg, my_dec):    
+    #log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile+'\nstartLabel='+startLabel+'\nstoppLabel='+stoppLabel)
     #   start of top level analysis
     
-    global fn
-    global ce_file
-    global varLabel
-    global doit
-    global fn_first
+    global  fn
+    global  ce_file
+    global  varLabel, echo_msg, my_decimal
+    global  doit
+    global  fn_first
 
     global  loop_mills, loop_label
-    global  bg, bgTime
+    global  bg, bgTime, bgTimeMap
     global  origTarLow, emulTarLow, origTarHig, emulTarHig
     global  origAs_ratio, emulAs_ratio              # Autosense
     global  origAI_ratio, emulAI_ratio              # autoISF
@@ -1695,7 +1825,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
     global  origInsReq, emulInsReq
     global  origSMB, emulSMB, origMaxBolus, emulMaxBolus
     global  origBasal, emulBasal, lastBasal
-    global  profISF, origISF, autoISF, emulISF, longDelta, avgDelta, longSlope, rateSlope
+    global  profISF, origISF, autoISF, BZ_ISF, Delta_ISF, pp_ISF, acceISF, dura_ISF, emulISF, longDelta, avgDelta, longSlope, rateSlope
     global  Pred, FlowChart, Fits
     global  filecount
     global  t_startLabel, t_stoppLabel
@@ -1706,6 +1836,12 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
     global  isZip                                   # flag for input file type
     global  newLoop                                 # flag whether data collection for new loop started
     #global  entries
+
+    global   deltas, linFit, cubFit
+    deltas      = {}
+    linFit      = {}
+    cubFit      = {}
+    bgTimeMap   = {}
     
     loop_mills  = []
     loop_label  = []
@@ -1741,6 +1877,11 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
     origISF     = []                                # holds the final ISF used in the original run
     profISF     = []                                # holds the ISF defined in the profile of the emulated run
     autoISF     = []                                # holds the ISF after checking the autosense impact, emulation run
+    BZ_ISF      = []                                # holds the ISF after strengthening due to high glucse level
+    Delta_ISF   = []                                # holds the ISF after strengthening due to high delta
+    pp_ISF      = []                                # holds the ISF after strengthening due to high delta after meals
+    acceISF     = []                                # holds the ISF after strengthening due to high acceleration
+    dura_ISF    = []                                # holds the ISF after strengthening due to high acceleration
     emulISF     = []                                # holds the final ISF after strengthening due to long lasting highs
     
     Pred        = {}                                # holds all loop predictions
@@ -1751,6 +1892,8 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
     filecount   = 0
     newLoop     = False
         
+    my_decimal = my_dec
+    echo_msg = msg    
     myfile = ''
     arg2 = arg2.replace('_', ' ')                   # get rid of the UNDERSCOREs
     doit = arg2.split('/')
@@ -1760,7 +1903,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         varLabel = varLabel[:-4]
     else:
         varFile = varFile + '.vdf'
-    #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)
+    #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)#   
     logListe = glob.glob(myseek+myfile, recursive=False)
     #print ('logListe:', str(logListe))
     # ---   add sorting info    -----------------------------------
@@ -1844,16 +1987,30 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
                     r_list += f'{round(origiob[iFrame]/10,2):>6}'   # was scaled up for plotting
                 if featured('cob'):     
                     r_list += f'{round(origcob[iFrame],2):>6}'
-                if featured('as ratio'):
-                    r_list += f'{round(origAs_ratio[iFrame]/10,2):>6}'     # was scaled up for plotting
-                if featured('autoISF'):
-                    r_list += f'{round(origAI_ratio[iFrame]/10,2):>6} {round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
+                #if featured('as ratio'):
+                #    r_list += f'{round(origAs_ratio[iFrame]/10,2):>6}'     # was scaled up for plotting
+                #if featured('autoISF'):
+                #    #_list += f'{round(origAI_ratio[iFrame]/10,2):>6} {round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
+                #    r_list += f'{round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
                 if featured('range'):
                     r_list += f'{longDelta[iFrame]:>6}{avgDelta[iFrame]:>7}'
-                if featured('slope'):
+                if featured('fitsslope') or featured('bestslope'):
                     r_list += f'{longSlope[iFrame]:>7}{rateSlope[iFrame]:>6}'
-                if featured('ISF'):
-                    r_list += f'{round(origISF[iFrame],1):>6}{round(profISF[iFrame],1):>6}{round(autoISF[iFrame],1):>6}{round(emulISF[iFrame],1):>6}'
+                if featured('fitsParabola') or featured('bestParabola'):
+                    this_List = 23*' '
+                    #print(str(bgTimeMap))
+                    if thisTime in bgTimeMap:
+                        deltaTime = bgTimeMap[thisTime]
+                        if deltaTime in deltas:
+                            thisDelta = deltas[deltaTime]
+                            if 'parabola_fit_minutes' in thisDelta:
+                                this_List = f'{thisDelta["parabola_fit_minutes"]:>7}{round(thisDelta["parabola_fit_last_delta"],2):>8}'
+                                this_List+= f'{round(thisDelta["parabola_fit_next_delta"],2):>8}'
+                    r_list += this_List
+                if featured('ISF') or featured('ISF-factors'): 
+                    r_list += f'{round(emulAs_ratio[iFrame]/10,2):>7}{round(acceISF[iFrame],2):>6}{round(BZ_ISF[iFrame],2):>6}{round(pp_ISF[iFrame],2):>6}{round(Delta_ISF[iFrame],2):>6}{round(dura_ISF[iFrame],2):>6}'
+                if featured('ISF') or featured('ISFs'):         # 21
+                    r_list += f'{round(origISF[iFrame],1):>9}{round(profISF[iFrame],1):>6}{round(emulISF[iFrame],1):>6}'
                 if featured('insReq'):
                     r_list += f'{origInsReq[iFrame]:>7}{emulInsReq[iFrame]:>6}'
                 if featured('SMB'):
@@ -1863,10 +2020,27 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
                 entries[thisTime] = r_list
                     
         # ---   print the comparisons    -------------------------
-        head= "    ----time formated as---       -----target-----                     -Autosens-  -autoISF-   --5% range--    --lin.fit--   ---------ISFs---------    insulin Req   -maxBolus-   ---SMB---   ---tmpBasal---\n" \
-            + " id    UTC         UNIX       bg    orig     emul    cob   iob    act  orig  emul  orig emul   dura    avg     dura    avg   orig  prof  auto  emul    orig   emul    orig emul   orig emul     orig    emul"
+        head1  = "  ;     ; ;     ;    ; target; target; target; target;      ;    ; "
+        head2  = "  ;  UTC; ; UNIX;    ;   low ;  high ;  low  ;  high ;      ;    ; "
+        head3  = "id; time;Z; time; bg ;  orig ;  orig ;  emul ;  emul ;  cob ; iob; act"
+        
+        head1 += "; auto; dura; dura;      ; lin.fit; "
+        head2 += "; sens;  ISF; min-; dura ;  min-  ; lin.fit"
+        head3 += "; orig; orig; utes; avg. ;  utes  ; delta"
+        
+        head1 += ";  parab; parab;  parab; parab"
+        head2 += ";   fit ;  fit ;  fit ;   fit"
+        head3 += "; correl; durat; last-Δ; next-Δ"
+
+        head1 += "; auto; acce;  bg ;   pp ; delta; dura;     ;     ;    "
+        head2 += "; sens ; ISF;  ISF;  ISF ;  ISF;  ISF;  ISF ;  ISF ; ISF"
+        head3 += "; emul; emul; emul; emul ; emul; emul ; orig;  prof; emul"
+
+        head1 += "; Ins.; Ins.; max ; max ;     ;     ;     ; "
+        head2 += "; Req.; Req.;bolus;bolus; SMB  ; SMB  ; TBR  ; TBR "
+        head3 += "; orig; emul; orig; emul; orig ; emul ; orig ; emul "
         #print('\n' + head)
-        xyf.write(head + '\n')
+        xyf.write(head1+'\n' + head2+'\n' + head3+'\n')
         
         origBasalint = 0.0
         emulBasalint = 0.0
@@ -1888,6 +2062,16 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         max_profISF= 0.0
         min_autoISF= 999
         max_autoISF= 0.0
+        min_dura_ISF= 999
+        max_dura_ISF= 0.0
+        min_BZ_ISF = 999
+        max_BZ_ISF = 0.0
+        min_Delta_ISF= 999
+        max_Delta_ISF= 0.0
+        min_pp_ISF = 999
+        max_pp_ISF = 0.0
+        min_acceISF= 999
+        max_acceISF= 0.0
         min_emulISF= 999
         max_emulISF= 0.0
         min_origSMB= 999
@@ -1896,17 +2080,32 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         max_emulSMB= 0.0
         
         for i in range(loopCount) :
-            tabz= f'{i:>3} {loop_label[i]} {loop_mills[i]:>13} {bg[i]:>4} ' \
-                + f'{origTarLow[i]:>4}-{origTarHig[i]:>3} {emulTarLow[i]:>4}-{emulTarHig[i]:>3} ' \
-                + f'{origcob[i]:>5} {round(origiob[i]/10,2):>5} {round(activity[i]/1000,3):>6} ' \
-                + f'{round(origAs_ratio[i]/10,2):>5} {round(emulAs_ratio[i]/10,2):>5}' \
-                + f'{round(origAI_ratio[i]/10,2):>6} {round(emulAI_ratio[i]/10,2):>4}' \
-                + f'{longDelta[i]:>7} {avgDelta[i]:>7}' \
-                + f'{longSlope[i]:>8} {rateSlope[i]:>6}' \
-                + f'{round(origISF[i],1):>7}{round(profISF[i],1):>6}{round(autoISF[i],1):>6}{round(emulISF[i],1):>6}' \
-                + f'{origInsReq[i]:>8} {emulInsReq[i]:>6} ' \
-                + f'{origMaxBolus[i]:>7} {emulMaxBolus[i]:>4} {origSMB[i]:>6} {emulSMB[i]:>4} ' \
-                + f'{origBasal[i]:>9} {emulBasal[i]:>6}'
+            tabz = f'{i:>3}; {loop_label[i][:-1]};Z; {loop_mills[i]:>13}; {bg[i]:>4}; ' 
+            tabz += f'{origTarLow[i]:>4};{origTarHig[i]:>3};{emulTarLow[i]:>4};{emulTarHig[i]:>3}; ' 
+            tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(activity[i]/1000,3):>6}; ' 
+            tabz += f'{round(origAs_ratio[i]/10,2):>5};'                # {round(emulAs_ratio[i]/10,2):>5};' 
+            tabz += f'{round(origAI_ratio[i]/10,2):>6}; ' 
+            tabz += f'{longDelta[i]:>7}; {avgDelta[i]:>7};' 
+            tabz += f'{longSlope[i]:>8}; {rateSlope[i]:>6};' 
+            this_List = 31*' '
+            thisTime = loop_mills[i]
+            skip_parab = True
+            if thisTime in bgTimeMap:
+                deltaTime = bgTimeMap[thisTime]
+                if deltaTime in deltas:
+                    thisDelta = deltas[deltaTime]
+                    if 'parabola_fit_minutes' in thisDelta:
+                        this_List = f'{round(thisDelta["parabola_fit_correlation"],4):>9};{round(thisDelta["parabola_fit_minutes"],1):>6};'
+                        this_List+= f'{round(thisDelta["parabola_fit_last_delta"],2):>8};{round(thisDelta["parabola_fit_next_delta"],2):>8};'
+                        skip_parab = False
+            if skip_parab: this_List = '; ; ; ;'
+            tabz += this_List
+            #tabz += f'{round(emulAs_ratio[i]/10,2):>5};{round(acceISF[i],2):>6};{round(BZ_ISF[i],2):>6};{round(pp_ISF[i],2):>6};{round(Delta_ISF[i],2):>6};{round(emulAI_ratio[i]/10,2):>4};'
+            tabz += f'{round(emulAs_ratio[i]/10,2):>5};{round(acceISF[i],2):>6};{round(BZ_ISF[i],2):>6};{round(pp_ISF[i],2):>6};{round(Delta_ISF[i],2):>6};{round(dura_ISF[i],2):>4};'
+            tabz += f'{round(origISF[i],1):>8};{round(profISF[i],1):>6};{round(emulISF[i],1):>6};' 
+            tabz += f'{origInsReq[i]:>8}; {emulInsReq[i]:>6}; ' 
+            tabz += f'{origMaxBolus[i]:>7}; {emulMaxBolus[i]:>4}; {origSMB[i]:>6}; {emulSMB[i]:>4}; ' 
+            tabz += f'{origBasal[i]:>9}; {emulBasal[i]:>6}'
             #print(tabz)
             origSMBsum += origSMB[i]
             emulSMBsum += emulSMB[i]
@@ -1933,32 +2132,71 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
             if max_profISF<profISF[i]:          max_profISF = profISF[i]
             if min_autoISF>autoISF[i]:          min_autoISF = autoISF[i]
             if max_autoISF<autoISF[i]:          max_autoISF = autoISF[i]
+            if min_dura_ISF>dura_ISF[i]:        min_dura_ISF = dura_ISF[i]
+            if max_dura_ISF<dura_ISF[i]:        max_dura_ISF = dura_ISF[i]
+            if min_BZ_ISF >BZ_ISF[i]:           min_BZ_ISF  = BZ_ISF[i]
+            if max_BZ_ISF <BZ_ISF[i]:           max_BZ_ISF  = BZ_ISF[i]
+            if min_Delta_ISF>Delta_ISF[i]:      min_Delta_ISF = Delta_ISF[i]
+            if max_Delta_ISF<Delta_ISF[i]:      max_Delta_ISF = Delta_ISF[i]
+            if min_pp_ISF >pp_ISF[i]:           min_pp_ISF  = pp_ISF[i]
+            if max_pp_ISF <pp_ISF[i]:           max_pp_ISF  = pp_ISF[i]
+            if min_acceISF>acceISF[i]:          min_acceISF = acceISF[i]
+            if max_acceISF<acceISF[i]:          max_acceISF = acceISF[i]
             if min_emulISF>emulISF[i]:          min_emulISF = emulISF[i]
             if max_emulISF<emulISF[i]:          max_emulISF = emulISF[i]
             if min_origSMB>origSMB[i]:          min_origSMB = origSMB[i]
             if max_origSMB<origSMB[i]:          max_origSMB = origSMB[i]
             if min_emulSMB>emulSMB[i]:          min_emulSMB = emulSMB[i]
             if max_emulSMB<emulSMB[i]:          max_emulSMB = emulSMB[i]
-            xyf.write(tabz + '\n')
+            xyf.write(tabz.replace('.', my_decimal) + '\n')
         
         sepLine = ''
-        for i in range(204):
-            sepLine += '-'
+        sepLine += 256 * '-'
         sepLine += '\n'
-        tabz = 'Minimum:'+ f'{min_bg:>24}' \
-             + f'{round(min_origAS/10,2):>43} {round(min_emulAS/10,2):>5}' \
-             + f'{round(min_origAI/10,2):>5} {round(min_emulAI/10,2):>5}' \
-             + f'{round(min_origISF,1):>37}{round(min_profISF,1):>6}{round(min_autoISF,1):>6}{round(min_emulISF,1):>6}' \
-             + f'{round(min_origSMB,1):>35} {round(min_emulSMB,1):>4}'
-        xyf.write(sepLine + tabz + '\n')
-        tabz = 'Maximum:'+ f'{max_bg:>24}' \
-             + f'{round(max_origAS/10,2):>43} {round(max_emulAS/10,2):>5}' \
-             + f'{round(max_origAI/10,2):>5} {round(max_emulAI/10,2):>5}' \
-             + f'{round(max_origISF,1):>37}{round(max_profISF,1):>6}{round(max_autoISF,1):>6}{round(max_emulISF,1):>6}' \
-             + f'{round(max_origSMB,1):>35} {round(max_emulSMB,1):>4}'
-        xyf.write(tabz + '\n')
-        tabz = 'Totals:'+ f'{round(origSMBsum,1):>175} {round(emulSMBsum,1):>4} {round(origBasalint,2):>9} {round(emulBasalint,2):>6}'
-        xyf.write(sepLine + tabz + '\n' + sepLine)
+        tabz = 'Minimum:;;;; '+ f'{min_bg:>24}' \
+             + f';;;;;;;;{round(min_origAS/10,2):>43}; {round(min_origAI/10,2):>5}' \
+             + f';;;;;;;;;{round(min_emulAS/10,2):>5}' \
+             + f';{round(min_acceISF,2):>6};{round(min_BZ_ISF,2):>6};{round(min_pp_ISF,2):>6};{round(min_Delta_ISF,2):>6};{round(min_dura_ISF,2):>5}' \
+             + f';{round(min_origISF,1):>69};{round(min_profISF,1):>6};{round(min_emulISF,1):>6}' \
+             + f';;;;;{round(min_origSMB,1):>35}; {round(min_emulSMB,1):>4}'
+        xyf.write(tabz.replace('.', my_decimal) + '\n')
+        tabz = 'Maximum:;;;; '+ f'{max_bg:>24}' \
+             + f';;;;;;;;{round(max_origAS/10,2):>43}; {round(max_origAI/10,2):>5}' \
+             + f';;;;;;;;;{round(max_emulAS/10,2):>5}' \
+             + f';{round(max_acceISF,2):>6};{round(max_BZ_ISF,2):>6};{round(max_pp_ISF,2):>6};{round(max_Delta_ISF,2):>6};{round(max_dura_ISF,2):>5}' \
+             + f';{round(max_origISF,1):>69};{round(max_profISF,1):>6};{round(max_emulISF,1):>6}' \
+             + f';;;;;{round(max_origSMB,1):>35}; {round(max_emulSMB,1):>4}'
+        xyf.write(tabz.replace('.', my_decimal) + '\n')
+        tabz = 'Totals:'+ ';'*35+f'{round(origSMBsum,1):>225}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
+        xyf.write(tabz.replace('.', my_decimal) + '\n')
+
+        # ---   list all types of delta information    -----------
+        #pro = os.system("SET PYTHONUTF8=1")
+        #print(str(pro))
+        delta_file = wd + fnLabel + '.' + varLabel + '.delta'
+        delta = open(delta_file, 'w')
+        delta.write('   time        time    [mg/dl]   5min    other-deltas    linear-fit    -----orig parabola fit-----    emul.par.fit\n' \
+                  + '    UTC        UNIX       bg     delta  short    long    dura slope     corr  dura  last-Δ  next-Δ    dura  next-Δ\n')
+        i = 0
+        for mills in deltas:
+            #mills = loop_mills[i]
+            i_label = loop_label[i]
+            ll  = f'{i_label:>9}  {round(bgTime[i],0):>10} {bg[i]:>4}'
+            ll += f'{round(deltas[mills]["delta"],2):>9} {round(deltas[mills]["short"],2):>7} {round(deltas[mills]["long"],2):>7}'
+            ll += f'{longSlope[i]:>8}{rateSlope[i]:>6}'
+            if 'parabola_fit_minutes' in deltas[mills]:
+                ll += f'{round(deltas[mills]["parabola_fit_correlation"],4):>9}{round(deltas[mills]["parabola_fit_minutes"],1):>6}'
+                ll += f'{round(deltas[mills]["parabola_fit_last_delta"],2):>8}{round(deltas[mills]["parabola_fit_next_delta"],2):>8}'
+            else:
+                ll += 31 * ' '
+            dura_p, delta_p, parabs, iMax = getBestParabolaBG(i)
+            ll += f'{round(dura_p,1):>8}{round(delta_p,2):>7}'
+            if iMax >=0:    ll += '  '+str(parabs[iMax]) 
+            delta.write(ll.replace('.', my_decimal) + '\n')
+            i += 1
+            if i >= len(loop_label):        break
+        delta.close()
+
     xyf.close()
     
     if len(entries) == 0:
@@ -1979,21 +2217,27 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         if featured('cob'):                             #  6 
             head1 += '      '
             head2 += '   COB'
-        if featured('as ratio'):                        #  6
-            head1 += '  Auto'
-            head2 += '  sens'
-        if featured('autoISF'):                         # 11
-            head1 += '  -AutoISF-'
-            head2 += '  orig emul'
+        #if featured('as ratio'):                        #  6
+        #    head1 += '  Auto'
+        #    head2 += '  sens'
+        #if featured('autoISF'):                         # 11
+        #    head1 += '  -AutoISF-'
+        #    head2 += '  orig emul'
         if featured('range'):                           # 13
             head1 += '  --5% range-'
             head2 += '  dura   avg.'
-        if featured('slope'):                           # 13
+        if featured('fitsslope') or featured('bestslope'):                           # 13
             head1 += '   --lin.fit-'
             head2 += '   dura  rate'
-        if featured('ISF'):                             # 24
-            head1 += '  ---------ISFs---------'
-            head2 += '  orig  prof  auto  emul'
+        if featured('fitsParabola') or featured('bestParabola'):                     # 21
+            head1 += '   ----parabola fit----'
+            head2 += '   dura  last-Δ  next-Δ'
+        if featured('ISF') or featured('ISF-factors'):  # 31
+            head1 += '   ------------ISF factors-----------'
+            head2 += '   auto  acce   bg    pp  delta  dura'
+        if featured('ISF') or featured('ISFs'):         # 21
+            head1 += '     ------ISFs------' 
+            head2 += '     orig  prof  emul'
         if featured('insReq'):                          # 13
             head1 += '  insulin Req'
             head2 += '   orig  emul'
@@ -2019,7 +2263,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries)
         log_msg(head2+tail)                                             # 1 record per print for safe rotations
         for thisTime in sorted_entries[len(sorted_entries)-top10:]:     # last hour plus
             values = entries[thisTime]
-            log_msg(values+tail)
+            log_msg(values.replace('.', my_decimal)+tail)
 
     # erase outdated entries; the remainder is kept in case a new logfile is started
     old_entries = copy.deepcopy(sorted_entries)
