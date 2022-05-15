@@ -10,6 +10,7 @@ Added commands to define circumdian profiles for basal, ISF, carb rartio
 Removed bugs
  - handle loop executions in between the 5 minute cycle
  - European daylight savings time added until starting summer 2022
+ - no more time shift between glucose curve and fitted curve
  
  
 
