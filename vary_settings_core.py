@@ -1016,6 +1016,7 @@ def scanLogfile(fn, entries):
                                 return 'STOP'
                             dataType_offset = dataType-79                   # "0" was lowest in V2.5.1
                             if dataType_offset >= 15:                       AAPS_Version = '2.7'    # same as 2.8
+                            elif dataType_offset < 0:                       AAPS_Version = '2.7'    # same as 3.0
                             #elif dataType == 79:    dataType_offset =  0    # V 2.5.1
                             #elif dataType == 80:    dataType_offset =  1    # V 2.6.1
                             #elif dataType == 94:    dataType_offset = 15    # V 2.8.0    >>> Invoking detemine_basal <<< / Wolfgang Spänle
@@ -1333,7 +1334,7 @@ def XYplots(loopCount, head1, head2, entries) :
     from matplotlib.backends.backend_pdf import PdfPages
     global yStep, yRange, thickness
     # ---   ensure that last loop was finished  -------------
-    if len(loop_mills) < len(bg)            :   bg.pop()
+    #f len(loop_mills) < len(bg)            :   bg.pop()            # bg  has its own vectors
     if len(loop_mills) < len(origTarLow)    :   origTarLow.pop()
     if len(loop_mills) < len(origTarHig)    :   origTarHig.pop()
     if len(loop_mills) < len(origInsReq)    :   origInsReq.pop()
@@ -1514,7 +1515,7 @@ def XYplots(loopCount, head1, head2, entries) :
                     axbg.plot(origTarLow, loop_mills, linestyle='dashed', marker='.', color='yellow', label='target  low, original')
 
                 if featured('bg') :                                                     # plot bg
-                    axbg.plot(bg,         loop_mills, linestyle='solid',  marker='o', color='red',    label='blood glucose')
+                    axbg.plot(bg,         bgTime,     linestyle='solid',  marker='o', color='red',    label='blood glucose')
                     dura05, avg05 = getHistBG(iFrame, 0.05)                             # mins in 5% band
                     if dura05>1 and featured('range'):
                         bg_min = avg05 * (1-0.05)
@@ -1729,7 +1730,7 @@ def XYplots(loopCount, head1, head2, entries) :
                         predZT = Fcasts['ZTpredBGs']
                         axbg.plot(origZT,  fcastmills[:len(origZT)],  linestyle='solid',            color=colFav['ZT'],  label='predZT, original')
                         axbg.plot(initZT,  fcastmills[:len(initZT)],  linestyle='None', marker='.', color=colFav['ZT'],  fillstyle='none')
-                        axbg.plot(predZT,  fcastmills[:len(predZT)],  linestyle='None', marker='.', Color=colFav['ZT'],  label='predZT, emulated')
+                        axbg.plot(predZT,  fcastmills[:len(predZT)],  linestyle='None', marker='.', color=colFav['ZT'],  label='predZT, emulated')
                     else:
                         axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['ZT'],  label='no ZT  active') # inactive
                     
@@ -1737,12 +1738,12 @@ def XYplots(loopCount, head1, head2, entries) :
             
             if frameFlow :                                                              # anything related to flow chart
                 axfl = fig.add_subplot(gs[0, flowOffset:])
-                axfl.set_xticklabels(['',''])                                           # dummy axis labels
                 axfl.set_xticks([-99,99999])                                            # off scale to suppress ticks
                 axfl.set_xlim(10, 200)
-                axfl.set_yticklabels(['',''])                                           # dummy axis labels
+                axfl.set_xticklabels(['',''])                                           # dummy axis labels
                 axfl.set_yticks([-99999,99])                                            # off scale to suppress ticks
                 axfl.set_ylim(-700, 0)
+                axfl.set_yticklabels(['',''])                                           # dummy axis labels
                 axfl.set_xlabel('Flowchart and decision logic at time ' + loop_label[iFrame], weight='bold')
                  
                 thisTime = loop_mills[iFrame]
