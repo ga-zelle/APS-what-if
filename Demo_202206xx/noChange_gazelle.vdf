@@ -1,0 +1,16 @@
+new_parameter   maxBolusIOBUsual        False       ### seit 3.Jan.2020
+new_parameter   maxBolusIOBRatio        4           ### schon vor 3.Jan.2020?
+new_parameter   SMBRatio                0.7         ### seit 3.Jan.2020
+new_parameter   maxBolusTargetRatio     3           ### seit 3.Jan.2020
+new_parameter   maxDeltaRatio           0.3         ### was 0.2; seit ?? ;3.Jan.2020
+new_parameter   insulinCapBelowTarget   True        ### AAPS is fix at False; enable capping below target
+new_parameter   CapFactor               8           ### previously I used 4; in future 5; meanwhile strenghtened to 8
+new_parameter   thresholdRatio          0.6         ### additional parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
+new_parameter   autoISF_flat            False       ### additional parameter; AAPS is fix at False; enable old autoISF_flat
+new_parameter   autoISF_slope           False       ### additional parameter; AAPS is fix at False; enable autoISF_slope
+new_parameter   autoISF_low             False       ### additional parameter; AAPS is fix at False; enable autoISF_low for lows
+new_parameter   CheckLibreError         False       ### additional parameter; AAPS is fix at True;  suppress that check
+
+new_parameter   LessSMBatModerateBG     True                        ### additional parameter; AAPS is fix at False; reduce SMB if ...
+new_parameter   LessSMBbelow            profile['max_bg'] + 10      ### ... bg below this value
+new_parameter   LessSMBFactor           2.0                         ### ... and multiply percentage reduction by 
