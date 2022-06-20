@@ -773,7 +773,7 @@ def sub_emul():
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
-        thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+        thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
         if thisTime == 'SYNTAX':
             runState.set('Emulation halted ... ')
             ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
@@ -790,7 +790,7 @@ def sub_emul():
         for fn in logListe:
             #log_msg("checking result file "+fn)
             ftype = fn[len(fn)-3:]
-            fn_first = wdir.get() + '/' + os.path.basename(fn)
+            #fn_first = wdir.get() + '/' + os.path.basename(fn)
             varLabel = variant[:-4]
             if ftype=='zip' or ftype.find(".")>=0:
                 logfil.set(fn_first+'.'+variant[:-4]+'.log')
@@ -840,7 +840,6 @@ scrlx = ttk.Scrollbar(runframe, orient=HORIZONTAL, command=lfd.xview)
 scrlx.grid(column=0, columnspan=5, row=runRow+2, sticky=(W,E,N))
 lfd['xscrollcommand'] = scrlx.set
 ttk.Button(runframe, text="Clear Messages", command=clear_msg).grid( column=0, row=runRow+0, sticky=(E), padx=20, pady=5)
-
 
 how_to_print = 'GUI'
 #how_to_print = 'print'                                                         # goes to DOS window; for debugging

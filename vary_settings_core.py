@@ -1957,16 +1957,18 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 my_ce_file(ce_file)                 # exports name to determine_basal.py
                 fn_first = wd + fnLabel
                 #print('fn_first =', wd + fnLabel)
+                #if how_to_print=='GUI':
+                #    fn_first_used.set(fn)
             if not isAndroid:        log_msg ('Scanning logfile '+fn)
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
             filecount += 1
-            if cont == 'SYNTAX':    return 'SYNTAX', 0, '', '', 0       # problem in VDF file
-            if cont == 'STOP':      break                               # end of time window reached
+            if cont == 'SYNTAX':    return 'SYNTAX', 0, '', '', 0, ''       # problem in VDF file
+            if cont == 'STOP':      break                                   # end of time window reached
     
     if filecount == 0 :
         log_msg ('no such logfile: "'+myseek+'"')
-        return 'Z', 0, '', '', 0
+        return 'Z', 0, '', '', 0, ''
     loopCount = len(loop_mills)
     if loopCount == 0 :
         log_msg ('no entries found in logfile: "'+myseek+'"')
@@ -2202,7 +2204,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     
     if len(entries) == 0:
         print('\nNo loop data yet in fresh logfile')
-        return 'Z',0, '', '', 0
+        return 'Z',0, '', '', 0, ''
     else:                                               #  6
         head1 = '  UTC '
         head2 = ' time '
@@ -2272,11 +2274,11 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if oldTime not in sorted_entries[len(sorted_entries)-top10:]:
             del entries[oldTime]                                        # no longer in last 14 entries
     if loopCount == 0:
-        return 'Z', 0, '', '', 0
+        return 'Z', 0, '', '', 0, ''
     else:
         extraSMB = emulSMB[loopCount-1] - origSMB[loopCount-1] 
         #print("origSMB="+str(origSMB)+"\nemulSMB="+str(emulSMB))
-        return loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB
+        return loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
     
 def set_tty(printframe, txtbox, channel):               # for GIU
     global how_to_print
