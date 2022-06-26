@@ -291,6 +291,7 @@ while wdhl[0]=='y':                                                             
     # All command line arguments known, go for main process
     thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal)
     if thisTime == 'SYNTAX':        break                                           # problem in VDF file
+    if thisTime == 'UTF8':          break                                           # PATHONUTF8 nor defined or incorrect
     #print('returned vary_ISF_batch:', CarbReqGram, ' minutes:',  CarbReqTime)
     if IsAndroid:
         thisHour = datetime.now()

@@ -1837,8 +1837,15 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  isZip                                   # flag for input file type
     global  newLoop                                 # flag whether data collection for new loop started
     #global  entries
-
     global   deltas, linFit, cubFit
+
+    utf8 = os.getenv('PYTHONUTF8', 'undefined')
+    if utf8 == 'undefined':
+        sub_issue('You need to set the environment variable PYTHONUTF8 first and assign the value 1')
+        return 'UTF8', 0, '', '', 0, ''        # not defined at all
+    if utf8 != '1':
+        sub_issue('Environment variable PYTHONUTF8 has wrong value '+utf8+', must be value 1')
+        return 'UTF8', 0, '', '', 0, ''        # wrong value
     deltas      = {}
     linFit      = {}
     cubFit      = {}
@@ -2023,11 +2030,11 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 entries[thisTime] = r_list
                     
         # ---   print the comparisons    -------------------------
-        head1  = "  ;     ; ;     ;    ; target; target; target; target;      ;    ; "
-        head2  = "  ;  UTC; ; UNIX;    ;   low ;  high ;  low  ;  high ;      ;    ; "
-        head3  = "id; time;Z; time; bg ;  orig ;  orig ;  emul ;  emul ;  cob ; iob; act"
+        head1  = "  ;    ; ;     ;  bg ;  bg ; target; target; target; target;       ;      ;    "
+        head2  = "  ; UTC; ; UNIX;accel;brake;   low ;  high ;  low  ;  high ;       ;      ;    "
+        head3  = "id; ime;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; act"
         
-        head1 += "; auto; dura; dura;      ; lin.fit; "
+        head1 += "; auto; final; dura;     ; lin.fit; "
         head2 += "; sens;  ISF; min-; dura ;  min-  ; lin.fit"
         head3 += "; orig; orig; utes; avg. ;  utes  ; delta"
         
@@ -2035,9 +2042,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         head2 += ";   fit ;  fit ;  fit ;   fit"
         head3 += "; correl; durat; last-Δ; next-Δ"
 
-        head1 += "; auto; acce;  bg ;   pp ; delta; dura;     ;     ;    "
-        head2 += "; sens ; ISF;  ISF;  ISF ;  ISF;  ISF;  ISF ;  ISF ; ISF"
-        head3 += "; emul; emul; emul; emul ; emul; emul ; orig;  prof; emul"
+        head1 += "; auto; acce;  bg ;  pp ; delta; dura; final;     ;     ;    "
+        head2 += "; sens ; ISF;  ISF;  ISF; ISF;  ISF;  ISF ;  ISF ;  ISF ; ISF"
+        head3 += "; emul; emul; emul; emul; emul; emul ; emul ; orig;  prof; emul"
 
         head1 += "; Ins.; Ins.; max ; max ;     ;     ;     ; "
         head2 += "; Req.; Req.;bolus;bolus; SMB  ; SMB  ; TBR  ; TBR "
@@ -2083,7 +2090,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         max_emulSMB= 0.0
         
         for i in range(loopCount) :
-            tabz = f'{i:>3}; {loop_label[i][:-1]};Z; {loop_mills[i]:>13}; {bg[i]:>4}; ' 
+            tabz = f'{i:>3};{loop_label[i][:-1]};Z; {loop_mills[i]:>13}; {bg[i]:>4}; ' 
+            if acceISF[i] < 1:
+                tabz += f'{bg[i]:>4}; '     # negative acceleration
+            else:                tabz += '    ; '             # positive acceleration
             tabz += f'{origTarLow[i]:>4};{origTarHig[i]:>3};{emulTarLow[i]:>4};{emulTarHig[i]:>3}; ' 
             tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(activity[i]/1000,3):>6}; ' 
             tabz += f'{round(origAs_ratio[i]/10,2):>5};'                # {round(emulAs_ratio[i]/10,2):>5};' 
@@ -2103,9 +2113,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                         skip_parab = False
             if skip_parab: this_List = '; ; ; ;'
             tabz += this_List
-            #tabz += f'{round(emulAs_ratio[i]/10,2):>5};{round(acceISF[i],2):>6};{round(BZ_ISF[i],2):>6};{round(pp_ISF[i],2):>6};{round(Delta_ISF[i],2):>6};{round(emulAI_ratio[i]/10,2):>4};'
+            #abz += f'{round(emulAs_ratio[i]/10,2):>5};{round(acceISF[i],2):>6};{round(BZ_ISF[i],2):>6};{round(pp_ISF[i],2):>6};{round(Delta_ISF[i],2):>6};{round(emulAI_ratio[i]/10,2):>4};'
             tabz += f'{round(emulAs_ratio[i]/10,2):>5};{round(acceISF[i],2):>6};{round(BZ_ISF[i],2):>6};{round(pp_ISF[i],2):>6};{round(Delta_ISF[i],2):>6};{round(dura_ISF[i],2):>4};'
-            tabz += f'{round(origISF[i],1):>8};{round(profISF[i],1):>6};{round(emulISF[i],1):>6};' 
+            #abz += f'{round(profISF[i]/emulISF[i],2):>4};{round(origISF[i],1):>8};{round(profISF[i],1):>6};{round(emulISF[i],1):>6};' 
+            tabz += f'{round(emulAI_ratio[i]/10,2):>4};{round(origISF[i],1):>8};{round(profISF[i],1):>6};{round(emulISF[i],1):>6};' 
             tabz += f'{origInsReq[i]:>8}; {emulInsReq[i]:>6}; ' 
             tabz += f'{origMaxBolus[i]:>7}; {emulMaxBolus[i]:>4}; {origSMB[i]:>6}; {emulSMB[i]:>4}; ' 
             tabz += f'{origBasal[i]:>9}; {emulBasal[i]:>6}'
@@ -2154,23 +2165,23 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             xyf.write(tabz.replace('.', my_decimal) + '\n')
         
         sepLine = ''
-        sepLine += 256 * '-'
+        sepLine += 265 * '-'
         sepLine += '\n'
-        tabz = 'Minimum:;;;; '+ f'{min_bg:>24}' \
-             + f';;;;;;;;{round(min_origAS/10,2):>43}; {round(min_origAI/10,2):>5}' \
-             + f';;;;;;;;;{round(min_emulAS/10,2):>5}' \
+        tabz = 'Minimum:;;;; '+ f'{min_bg:>22}' \
+             + f';;;;;;;;;{round(min_origAS/10,2):>45}; {round(min_origAI/10,2):>5}' \
+             + f';;;;;;;;;{round(min_emulAS/10,2):>67}' \
              + f';{round(min_acceISF,2):>6};{round(min_BZ_ISF,2):>6};{round(min_pp_ISF,2):>6};{round(min_Delta_ISF,2):>6};{round(min_dura_ISF,2):>5}' \
-             + f';{round(min_origISF,1):>69};{round(min_profISF,1):>6};{round(min_emulISF,1):>6}' \
+             + f';;{round(min_origISF,1):>11};{round(min_profISF,1):>6};{round(min_emulISF,1):>6}' \
              + f';;;;;{round(min_origSMB,1):>35}; {round(min_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
-        tabz = 'Maximum:;;;; '+ f'{max_bg:>24}' \
-             + f';;;;;;;;{round(max_origAS/10,2):>43}; {round(max_origAI/10,2):>5}' \
-             + f';;;;;;;;;{round(max_emulAS/10,2):>5}' \
+        tabz = 'Maximum:;;;; '+ f'{max_bg:>22}' \
+             + f';;;;;;;;;{round(max_origAS/10,2):>45}; {round(max_origAI/10,2):>5}' \
+             + f';;;;;;;;;{round(max_emulAS/10,2):>67}' \
              + f';{round(max_acceISF,2):>6};{round(max_BZ_ISF,2):>6};{round(max_pp_ISF,2):>6};{round(max_Delta_ISF,2):>6};{round(max_dura_ISF,2):>5}' \
-             + f';{round(max_origISF,1):>69};{round(max_profISF,1):>6};{round(max_emulISF,1):>6}' \
+             + f';;{round(max_origISF,1):>11};{round(max_profISF,1):>6};{round(max_emulISF,1):>6}' \
              + f';;;;;{round(max_origSMB,1):>35}; {round(max_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
-        tabz = 'Totals:'+ ';'*35+f'{round(origSMBsum,1):>225}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
+        tabz = 'Totals:'+ ';'*37+f'{round(origSMBsum,1):>229}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
 
         # ---   list all types of delta information    -----------

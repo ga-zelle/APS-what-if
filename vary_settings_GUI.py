@@ -778,31 +778,34 @@ def sub_emul():
             runState.set('Emulation halted ... ')
             ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
             #sub_issue('Problem in VDF file. For details, see file "*.'+variant[:-4]+'.log"')
+        elif thisTime == 'UTF8':
+            runState.set('Emulation aborted ... ')
+            ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
         else:   
             runState.set('Emulation finished ..')
             ttk.Label(runframe, textvariable=runState, style='Done.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
-        runframe.update()                                                       # update frame display
 
-        # load result filenames into resframe
-        newaf = afil.get()
-        logListe = glob.glob(newaf, recursive=False)                            # the wild card match
-        filecount = 0
-        for fn in logListe:
-            #log_msg("checking result file "+fn)
-            ftype = fn[len(fn)-3:]
-            #fn_first = wdir.get() + '/' + os.path.basename(fn)
-            varLabel = variant[:-4]
-            if ftype=='zip' or ftype.find(".")>=0:
-                logfil.set(fn_first+'.'+variant[:-4]+'.log')
-                tabfil.set(fn_first+'.'+variant[:-4]+'.csv')
-                deltafil.set(fn_first+'.'+variant[:-4]+'.delta')
-                txtorig.set(fn_first+'.' + 'orig' +  '.txt')
-                txtemul.set(fn_first+'.'+variant[:-4]+'.txt')
-                pdffil.set(fn_first+'.'+variant[:-4]+'.pdf')
-                resframe.focus()
-                book.select(3)                                                  # activate result tab
-                logfil_entry.focus()                                            # activate as initial input box
-                break                                                           # use name from 1st match
+            # load result filenames into resframe
+            newaf = afil.get()
+            logListe = glob.glob(newaf, recursive=False)                            # the wild card match
+            filecount = 0
+            for fn in logListe:
+                #log_msg("checking result file "+fn)
+                ftype = fn[len(fn)-3:]
+                #fn_first = wdir.get() + '/' + os.path.basename(fn)
+                varLabel = variant[:-4]
+                if ftype=='zip' or ftype.find(".")>=0:
+                    logfil.set(fn_first+'.'+variant[:-4]+'.log')
+                    tabfil.set(fn_first+'.'+variant[:-4]+'.csv')
+                    deltafil.set(fn_first+'.'+variant[:-4]+'.delta')
+                    txtorig.set(fn_first+'.' + 'orig' +  '.txt')
+                    txtemul.set(fn_first+'.'+variant[:-4]+'.txt')
+                    pdffil.set(fn_first+'.'+variant[:-4]+'.pdf')
+                    resframe.focus()
+                    book.select(3)                                              # activate result tab
+                    logfil_entry.focus()                                        # activate as initial input box
+                    break                                                       # use name from 1st match
+        runframe.update()                                                       # update frame display
                 
     except:                                                                     # catch *all* exceptions
         #e = sys.exc_info()[0]
