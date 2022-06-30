@@ -311,7 +311,7 @@ def setVariant(stmp):
     syntax_error = False
     for orig_zeile in var:
         try:
-            zeile = orig_zeile
+            zeile = orig_zeile.replace('\t', ' ')                                   # get rid of TAB characters
             # get array name
             woEndArray  = zeile.find(' ')
             myArray     = zeile[:woEndArray]
@@ -2263,7 +2263,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             head2 += '   orig   emul'
     
     if isAndroid :
-        maxItems = 14           
+        maxItems = 12           
     else:
         maxItems = len(loop_label)
         if loopCount > 0 :          XYplots(loopCount, head1, head2, entries)
