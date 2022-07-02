@@ -1839,13 +1839,6 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     #global  entries
     global   deltas, linFit, cubFit
 
-    utf8 = os.getenv('PYTHONUTF8', 'undefined')
-    if utf8 == 'undefined':
-        sub_issue('You need to set the environment variable PYTHONUTF8 first and assign the value 1')
-        return 'UTF8', 0, '', '', 0, ''        # not defined at all
-    if utf8 != '1':
-        sub_issue('Environment variable PYTHONUTF8 has wrong value '+utf8+', must be value 1')
-        return 'UTF8', 0, '', '', 0, ''        # wrong value
     deltas      = {}
     linFit      = {}
     cubFit      = {}
@@ -1937,6 +1930,13 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         isAndroid = True
     else:
         isAndroid = False
+        utf8 = os.getenv('PYTHONUTF8', 'undefined')
+        if utf8 == 'undefined':
+            sub_issue('You need to set the environment variable PYTHONUTF8 first and assign the value 1')
+            return 'UTF8', 0, '', '', 0, ''        # not defined at all
+        if utf8 != '1':
+            sub_issue('Environment variable PYTHONUTF8 has wrong value '+utf8+', must be value 1')
+            return 'UTF8', 0, '', '', 0, ''        # wrong value
         
     wd = os.path.dirname(varFile)
     if isAndroid:       wd = wd + '/'
