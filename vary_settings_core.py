@@ -980,7 +980,13 @@ def scanLogfile(fn, entries):
     cont = 'MORE'                               # in case nothing found
     while notEOF:                               # needed because "for zeile in lf" does not work with AAPS 2.5
         try:                                    # needed because "for zeile in lf" does not work with AAPS 2.5
-            zeile = lf.readline()               # needed because "for zeile in lf" does not work with AAPS 2.5
+            while True:
+                try:
+                    zeile = lf.readline()           # needed because "for zeile in lf" does not work with AAPS 2.5
+                    break
+                except FileNotFoundError:
+                    log_msg('waiting 10s for logfile housekeeping')
+                    time.sleep(10)
             if isZip:   zeile = str(zeile)[2:-3]# strip off the "'b....'\n" remaining from the bytes to str conversion
             if zeile == '':                     # needed because "for zeile in lf" does not work with AAPS 2.5
                 notEOF = False                  # needed because "for zeile in lf" does not work with AAPS 2.5
