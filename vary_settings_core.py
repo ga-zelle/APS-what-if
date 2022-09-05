@@ -294,6 +294,14 @@ def setVariant(stmp):
     new_parameter['AAPS_Version'] = AAPS_Version        ### place it before so it could be modified later
     new_parameter['LessSMBatModerateBG'] = False        ### additional parameter; AAPS is fix at False; reduce SMB if ...
     new_parameter['LessSMBbelow'] = 0.0                 ### ... bg below this value
+    if 'iobTHtolerance' not in new_parameter:
+        new_parameter['iobTHtolerance'] = 100           ### not known before ai3.0
+    if 'iob_threshold_percent' not in profile:
+        profile['iob_threshold_percent'] = 100          ### not known before ai3.0
+    if 'profile_percentage' not in profile:
+        profile['profile_percentage'] = 100             ### not known before ai3.0
+    if 'enableSMB_EvenOn_OddOff' not in profile:
+        profile['enableSMB_EvenOn_OddOff'] = False      ### not known before ai2.2.7
     if AAPS_Version == '<2.7':                          
         profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
         profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case

@@ -29,6 +29,7 @@ def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
         res0={"positive":0,"neutral":2,"negative":1}[res0["which"]]
     else:
         res0=-1
+    droid.dialogDismiss()                       # important for Android12
     return res0,res
 
 def waitNextLoop(arg,varName):                  # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
@@ -52,7 +53,7 @@ def waitNextLoop(arg,varName):                  # arg = hh:mm:ss of last loop ex
             waitSec = 60                        # was even negative sometimes
     then = datetime.now() + timedelta(seconds=waitSec)
     thenStr = format(then, '%H:%M')
-    print ('Variant "' + varName + '"\nwaiting ' + str(waitSec) + ' sec for next loop at '+ thenStr)
+    print ('\nWaiting ' + str(waitSec) + 'sec for next loop at '+ thenStr + ';   Variant "' + varName + '"')
     return waitSec
 
 def alarmHours(titel):
