@@ -703,7 +703,7 @@ def sub_emul():
     whereColon = varyHome.find(':')
     if whereColon < 0:
         varyHome = os.getcwd()
-    varyHome = os.path.dirname(varyHome) + '\\'
+    varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
     m +='\n vary_settings home directory  ' + varyHome
     global echo_msg
