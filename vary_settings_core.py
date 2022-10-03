@@ -21,6 +21,11 @@ import copy
 import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
+def get_version_core(echo_msg):
+    echo_msg['vary_settings_core.py'] = '2022-10-03 00:35'
+    return echo_msg
+
+
 
 def hole(sLine, Ab, Auf, Zu):
     #E extrahiere Substring ab der Stelle "ab"

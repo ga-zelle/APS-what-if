@@ -15,6 +15,13 @@ from vary_settings_core import parameters_known
 from vary_settings_core import set_tty
 from vary_settings_core import log_msg, sub_issue
 
+from vary_settings_core import get_version_core
+from determine_basal    import get_version_determine_basal
+def get_version_GUI(echo_msg):
+    echo_msg['vary_settings_GUI.py'] = '2022-10-03 00:54'
+    return echo_msg
+
+
 
 #################################################################################
 #   overall layout                                                              #
@@ -708,11 +715,11 @@ def sub_emul():
     m +='\n vary_settings home directory  ' + varyHome
     global echo_msg
     echo_msg = {}
-    echo_version('vary_settings_GUI.py')
-    echo_version('vary_settings_core.py')
-    echo_version('determine_basal.py')
+    echo_msg = get_version_GUI(echo_msg)
+    echo_msg = get_version_core(echo_msg)
+    echo_msg = get_version_determine_basal(echo_msg)
     for ele in echo_msg:
-        m += '\n dated: '+ele + ',   module name: '+echo_msg[ele]
+        m += '\n dated: '+echo_msg[ele] + '       module name: '+ele
     #m += '\n' + '='*66 + '\n'
     m += '\n'+'-'*66+'\nEcho of execution parameters used\n'+'-'*66
     m += '\nLogfile(s) to scan    ' + afil.get()

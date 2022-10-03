@@ -9,6 +9,10 @@ import copy
 #import matplotlib.pyplot as plt
 #import setTempBasal as tempBasalFunctions
 
+def get_version_determine_basal(echo_msg):
+    echo_msg['determine_basal.py'] = '2022-10-03 00:30'
+    return echo_msg
+
 def round_basal(value, dummy) :
     # copied to setTempBasal, too !!!
     # initially fixed
