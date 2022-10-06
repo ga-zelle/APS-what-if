@@ -10,7 +10,7 @@ from vary_settings_core import set_tty
 from vary_settings_core import get_version_core
 from determine_basal    import get_version_determine_basal
 def get_version_batch(echo_msg):
-    echo_msg['vary_settings_batch.py'] = '2022-10-03 00:54'
+    echo_msg['vary_settings_batch.py'] = '2022-10-06 23:00'
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
@@ -203,11 +203,11 @@ if IsAndroid :
     m +='\n vary_settings home directory  ' + varyHome
     #global echo_msg
     echo_msg = {}
-    echo_version('vary_settings_batch.py')
-    echo_version('vary_settings_core.py')
-    echo_version('determine_basal.py')
+    echo_msg = get_version_batch(echo_msg)
+    echo_msg = get_version_core(echo_msg)
+    echo_msg = get_version_determine_basal(echo_msg)
     for ele in echo_msg:
-        m += '\n dated: '+ele + ',   module name: '+echo_msg[ele]
+        m += '\n dated: '+echo_msg[ele] + '       module name: '+ele
     m += '\n' + '='*66 + '\n'
 
 
