@@ -1,4 +1,4 @@
-This branch is still under development. The new software is fairly stable but the documentation is in flux.
+This branch is still under development. The new software is fairly stable but the documentation is still in flux.
 Major updates:
 - include the autoISF2.2.8.1 capabilities
 - reorganise the user documentation
