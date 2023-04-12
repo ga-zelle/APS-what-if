@@ -1,6 +1,6 @@
-This branch was updated to cover 
-- the migration to AAPS 3.1.0.2 
-- to include the autoISF2.2.7 capabilities
+This branch is under development and will be updated to cover 
+- the migration to AAPS 3.1.0.3 
+- to include the autoISF2.2.8.1 capabilities
 
 # APS-what-if
 
