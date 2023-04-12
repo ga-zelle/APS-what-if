@@ -39,10 +39,10 @@ This is an older document which guides you through the process of generating spr
 </details>
 
 <details><summary>The AAPS Logfile System.pdf</summary>
-  Tells you where to find the logfiles.
+Tells you where to find the logfiles.
 
-  Explains facts about the naming and storage.
+Explains facts about the naming and storage.
   
-  Gives hints about downloading them to the PC ready for use by the emulator.
+Gives hints about downloading them to the PC ready for use by the emulator.
 </details>
 
