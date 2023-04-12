@@ -1,8 +1,8 @@
-This branch is under development and is being updated to cover 
-- to include the autoISF2.2.8.1 capabilities
-- to reorganise the user documentation
+This branch is under development and is being updated to 
+- include the autoISF2.2.8.1 capabilities
+- reorganise the user documentation
 
-For details see the change_log.md
+For details see the change.log
 
 # APS-emulator
 
