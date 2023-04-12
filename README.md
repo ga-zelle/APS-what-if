@@ -3,11 +3,11 @@ Major updates:
 - include the autoISF2.2.8.1 capabilities
 - reorganise the user documentation
 
-For details see the change.log
+See also the change.log
 
 # APS-emulator
 
-I translated the original java code of "determineSMB-basal" into python and can run it on a PC. 
+I translated the original java-script code of "determineSMB-basal.js" into python and can run it on a PC. 
 This allows me to untertake a time tarvel back to any time slot and see how insulin delivery 
 would have differed with different APS settings. This offers a safe method to play with settings 
 and check their impact before actually adapting them in APS itself.
