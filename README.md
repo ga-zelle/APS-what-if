@@ -1,8 +1,10 @@
 This branch is under development and is being updated to cover 
 - to include the autoISF2.2.8.1 capabilities
-- to reorganise the user documentationFor details see the change_log.md
+- to reorganise the user documentation
 
-# APS-what-if
+For details see the change_log.md
+
+# APS-emulator
 
 I translated the original java code of "determineSMB-basal" into python and can run it on a PC. 
 This allows me to untertake a time tarvel back to any time slot and see how insulin delivery 
