@@ -38,3 +38,11 @@ By running the emulator on the AAPS phone you can already get live hints when ex
 This is an older document which guides you through the process of generating spreadsheet tables and graphs. These help in identifying which parameter to modify and provide a first estimate by how much.
 </details>
 
+<details><summary>The AAPS Logfile System.pdf</summary>
+Tells you where to find the logfiles.
+
+  Explains facts about the naming and storage.
+  
+  Gives hints about downloading them to the PC ready for use by the emulator.
+</details>
+
