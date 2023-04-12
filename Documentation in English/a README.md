@@ -12,7 +12,7 @@ Explains functionality and usage of the emulator
 Contains some examples
 </details>
 
-<details><summary>Examplesof VDF Files for the AAPS Emulator.pdf</summary>
+<details><summary>Examples of VDF Files for the AAPS Emulator.pdf</summary>
 Lists all possible instructions types
   
 Shows examples starting from straitforward to very complex ones
@@ -20,7 +20,7 @@ Shows examples starting from straitforward to very complex ones
 Examples can be used via copy/paste
 </details>
 
-<details><summary>How-to-get-lager-SMBs.docx</summary>
+<details><summary>How-to-get-larger-SMBs.pdf</summary>
 List steps to go through from simple to advanced if you want to get larger SMB but the setup does not allow you. 
   
 It covers methods available in standard AAPS and progresses to methods only available in autoISF.
