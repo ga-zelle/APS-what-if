@@ -2,22 +2,27 @@ List of documents; click arrow to see their purpose
 
 <details><summary>Installation guide.pdf</summary>
 Starts from getting and installing the required files and 
+  
 ends with seeing the first result using a demo case as a confirmation of success
 </details>
 
 <details><summary>Instructions for the AAPS emulator.pdf</summary>
 Explains functionality and usage of the emulator
+  
 Contains some examples
 </details>
 
 <details><summary>Examplesof VDF Files for the AAPS Emulator.pdf</summary>
 Lists all possible instructions types
+  
 Shows examples starting from straitforward to very complex ones
+  
 Examples can be used via copy/paste
 </details>
 
 <details><summary>How-to-get-lager-SMBs.docx</summary>
 List steps to go through from simple to advanced if you want to get larger SMB but the setup does not allow you. 
+  
 It covers methods available in standard AAPS and progresses to methods only available in autoISF.
 
 This was moved to the autoISF repo because it can be used in parts without the emulator.
