@@ -9,7 +9,7 @@ Contains some examples
 <details><summary>Guide to VDF Files for the AAPS Emulator.pdf</summary>
 Lists all possible instructions types
   
-Shows examples starting from straitforward to very complex ones
+Shows examples starting from straightforward to very complex ones
   
 Examples can be used via copy/paste
 </details>
