@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-04-09 01:28'
+    echo_msg['emulator_core.py'] = '2023-04-19 11:40'
     return echo_msg
 
 
@@ -1010,11 +1010,10 @@ def ConvertSTRINGooDate(stmp) :
     else:               
         MSmillis = 0                            # in AMA mode there are no millis
     #print ('aus', stmp, ' wird', str(MSJahr), str(MSMonat), str(MSTag), str(MSStunde), str(MSMinute), str(MSSekunde), str(MSmillis))
-    NumericDate= datetime.datetime(MSJahr, MSMonat, MSTag, MSStunde, MSMinute, MSSekunde, MSmillis*1000)
+    NumericDate= datetime.datetime(MSJahr, MSMonat, MSTag, MSStunde, MSMinute, MSSekunde, MSmillis*1000, timezone.utc)  # keep it in UTC
     #imestamp = NumericDate.replace(tzinfo=timezone.utc).timestamp() + 3600 # 1h MEZ offset
     #print('entered Convert.. with stmp='+stmp+'\n  NumericDate='+str(NumericDate))
-    timestamp = int( (NumericDate.timestamp() + 3600 + dlst) * 1000 )       # 1h MEZ offset
-    #print('  timestamp='+str(timestamp))
+    timestamp = int( (NumericDate.timestamp() + 3600*0 + dlst*0) * 1000 )       # keep it in UTC; was 1h MEZ offset
     #print("Eingang: " + stmp + "\nAusgang: " + str(timestamp) )
     return timestamp
 
