@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-04-19 11:40'
+    echo_msg['emulator_core.py'] = '2023-04-20 18:24'
     return echo_msg
 
 
@@ -346,7 +346,9 @@ def setVariant(stmp):
     fnam= varLabel + '.dat'
     var = open(varFile, 'r')
     syntax_error = False
+    ocount = 0
     for orig_zeile in var:
+        ocount+= 1
         try:
             zeile = orig_zeile.replace('\t', ' ')                                   # get rid of TAB characters
             # get array name
@@ -523,8 +525,10 @@ def setVariant(stmp):
                 logres = myVal
             elif myArray == 'STAIR_ISF' :
                 STAIR_ISF[myItem] = eval(myVal)
+                logres = myVal
             elif myArray == 'STAIR_LTG' :
                 STAIR_LTG[myItem] = eval(myVal)
+                logres = myVal
             elif myArray == 'STAIR_HTG' :
                 STAIR_HTG[myItem] = eval(myVal)
                 logres = myVal
@@ -544,10 +548,10 @@ def setVariant(stmp):
                 validRow = False
         
             if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
-            else:           varlog.write('not actioned: ['+myArray+'], ['+myItem+'], ['+myVal+']'+'\n')
+            else:           varlog.write('not actioned: ['+myArray+'], ['+myItem+'], ['+myVal[:-1]+']'+'\n')
         except: # catch *all* exceptions
             e = sys.exc_info()[0]
-            varlog.write("*******\nProblem in VDF-file in row reading\n"+orig_zeile+"\nerror message is:"+str(e)+"\n*******\n")
+            varlog.write("*******\nProblem in VDF-file in row "+str(ocount)+" reading\n"+orig_zeile+"\nerror message is:"+str(e)+"\n*******\n")
             sub_issue('error found while processing VDF file. For details, see file "*.'+varLabel+'.log"')
             syntax_error = True
                     
