@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-04-12 11:04'
+    echo_msg['determine_basal.py'] = '2023-04-26 01:00'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -1658,8 +1658,8 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             maxDeltaPercentage = new_parameter['maxDeltaRatio']
         else:
             maxDeltaPercentage = 0.2            # gz half power loop
-    elif 'cgmFlatMinutes' in glucose_status:
-        maxDeltaPercentage = 0.3                # for autoISF  2.2.8
+    #elif 'cgmFlatMinutes' in glucose_status:   # not active in in public master - ba mistake?
+    #    maxDeltaPercentage = 0.3                # for autoISF  2.2.8
     else:
         maxDeltaPercentage = 0.2                # for version <2.2.8
     if ( maxDelta > maxDeltaPercentage * bg ) :                                         ##### allow this change via new_ parameter
@@ -1913,10 +1913,10 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             insulinReq = capInsulin(insulinReq, target_bg, bg, new_parameter['insulinCapBelowTarget'], new_parameter['CapFactor'], Flows)          #### GZ mod4b: reduce overnight insulin; leave it here to ba compatible with wrong position in 2.7 actual
         insulinReq = round(insulinReq,3)
         rT['insulinReq'] = insulinReq
-        #//console_error(iob_data.lastBolusTime);
+        #// console_error('lastBolusTime:', str(iob_data['lastBolusTime']))
         #// minutes since last bolus
         lastBolusAge = round(( thisTime - iob_data['lastBolusTime'] ) / 60000,1)
-        #//console_error(lastBolusAge);
+        console_error('thisTime:', str(thisTime), '; lastBolusTime:', str(iob_data['lastBolusTime']), '; lastBolusAge:', str(lastBolusAge))
         #//console_error(profile.temptargetSet, target_bg, rT.COB);
         #// only allow microboluses with COB or low temp targets, or within DIA hours of a bolus
         if (microBolusAllowed and enableSMB and bg > threshold) :
