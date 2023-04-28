@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-04-26 01:00'
+    echo_msg['determine_basal.py'] = '2023-04-28 20:35'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -224,7 +224,7 @@ def loop_smb(profile, iob_data, Flows):
         else :
             msgType = "profile target "
 
-        if ('out_units' in profile and profile['out_units'] == "mmol/L") :
+        if ('out_units' in profile and profile['out_units'] == "mmol\/L") :
             evenTarget = round(target*10, 0) %2 == 0
             msgUnits   = " has "
             msgTail    = " decimal"

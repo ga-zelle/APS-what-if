@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-04-20 18:24'
+    echo_msg['emulator_core.py'] = '2023-04-28 20:50'
     return echo_msg
 
 
@@ -2123,7 +2123,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 if featured('bg'):      
                     r_list += f'{bg[iFrame]:>6}'
                 if featured('target'):
-                    r_list += f'{(origTarLow[iFrame] + origTarHig[iFrame])/2:>6}'
+                    r_list += f'{round((origTarLow[iFrame] + origTarHig[iFrame])/2,0):>8}'.replace(".0","")
                 if featured('iob'):     
                     r_list += f'{round(origiob[iFrame]/10,2):>6}'   # was scaled up for plotting
                 if featured('cob'):     
