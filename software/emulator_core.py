@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-04-28 20:50'
+    echo_msg['emulator_core.py'] = '2023-05-02 00:00'
     return echo_msg
 
 
@@ -575,7 +575,7 @@ def getOrigPred(predBGs):
     #print ('orig preds --> '+str(Fcasts))
     return Fcasts
 
-def TreatLoop(Curly, log, lcount):
+def TreatLoop(Curly, log, lcount, fn):
     global SMBreason, newLoop
     global loop_mills, loop_label, bgTimeMap
     global origInsReq
@@ -725,10 +725,11 @@ def TreatLoop(Curly, log, lcount):
         #print('row', str(lcount), 'deltas', str(len(longDelta)), str(longDelta), '\nslopes', str(len(longSlope)), str(longSlope))
         #Fcasts = getOrigPred(suggest['predBGs'])
         Flows  = []
+        #print('\n'+str(loop_label), '\n'+str(glucose_status))
         if setVariant(stmp):        return 'SYNTAX'     # syntax problem in VDF file
         
         #if profile['new_parameter']['bestParabola']:       dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
-        
+        log_msg('Scanning logfile '+fn+ ',  loop time stamp '+stmp,'\r')
         reT = detSMB.determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, MicroBolusAllowed, reservoir, thisTime, Fcasts, Flows, emulAI_ratio)
         #newLoop = False
         if len(origAI_ratio)<len(emulAI_ratio):
@@ -832,41 +833,42 @@ def get_glucose_status(lcount, st) :                    # key = 80
     glucose_status['row'] = lcount
     #print('entered glucose_status for row='+str(lcount)+'  loop_mills='+'loop_mills[-1]' + '  total count='+str(len(bg))+' with\n '+Curly)
     #print('entered glucose_status for row='+str(lcount)+'  total mills='+str(len(loop_mills))+ '  total BGs='+str(len(bg))+' with\n '+Curly)
-    if len(bg)==len(loop_mills) :
-        bg.append(glucose_status['glucose'])            # start next iteration
-        mills = glucose_status['date']/1000             # time of bg value in seconds; was milliseconds
-        #bgTime.append(mills)                            # time of bg value in seconds; was minutes
-        for i in range(100):                            # in case rth elp is executed 100 times before next CGM
-            mills += 0.0001
-            if mills not in deltas:    break            # use bg_time with very small offset
-        bgTime.append(mills)                            # time of bg value in seconds; was minutes
-        deltas[mills] = {'bg':glucose_status['glucose'], 'delta':glucose_status['delta'], 'short':glucose_status['short_avgdelta'], 'long':glucose_status['long_avgdelta']}
-        if 'dura_ISF_minutes' not in glucose_status:
-            mins, averg = getHistBG(len(bg)-1, 0.05)
-            glucose_status['dura_ISF_minutes'] = mins
-            glucose_status['dura_ISF_average'] = averg
-        if 'parabola_fit_minutes' not in glucose_status:
-            dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
-            if iMax>= 0:
-                #print(str(iMax), str(parabs[iMax]))
-                glucose_status['parabola_fit_minutes']      = round(parabs[iMax]['dur'], 1)
-                glucose_status['parabola_fit_correlation']  = parabs[iMax]['corr']
-                glucose_status['bg_acceleration']           = parabs[iMax]['a2'] * 2
-                glucose_status['parabola_fit_last_delta']   = parabs[iMax]['a1'] - parabs[iMax]['a2']
-                glucose_status['parabola_fit_next_delta']   = parabs[iMax]['a1'] + parabs[iMax]['a2']
-                glucose_status['parabola_fit_a0']           = parabs[iMax]['a0']
-                glucose_status['parabola_fit_a1']           = parabs[iMax]['a1']
-                glucose_status['parabola_fit_a2']           = parabs[iMax]['a2']
-            else:   # no fit
-                glucose_status['parabola_fit_correlation']  = 0
-                glucose_status['bg_acceleration']           = 0
-                glucose_status['parabola_fit_a2']           = 0
-        if 'parabola_fit_minutes' in glucose_status:
-            deltas[mills]['parabola_fit_minutes']    = glucose_status['parabola_fit_minutes']
-            deltas[mills]['parabola_fit_correlation']= glucose_status['parabola_fit_correlation']
-            deltas[mills]['parabola_fit_last_delta'] = glucose_status['parabola_fit_last_delta']
-            deltas[mills]['parabola_fit_next_delta'] = glucose_status['parabola_fit_next_delta']
-    else:
+    #print('='*20)
+    #if len(bg)==len(loop_mills) :
+    bg.append(glucose_status['glucose'])            # start next iteration
+    mills = glucose_status['date']/1000             # time of bg value in seconds; was milliseconds
+    for i in range(100):                            # in case rth elp is executed 100 times before next CGM
+        mills += 0.0001
+        if mills not in deltas:    break            # use bg_time with very small offset
+    bgTime.append(mills)                            # time of bg value in seconds; was minutes
+    deltas[mills] = {'bg':glucose_status['glucose'], 'delta':glucose_status['delta'], 'short':glucose_status['short_avgdelta'], 'long':glucose_status['long_avgdelta']}
+    if 'dura_ISF_minutes' not in glucose_status:
+        mins, averg = getHistBG(len(bg)-1, 0.05)
+        glucose_status['dura_ISF_minutes'] = mins
+        glucose_status['dura_ISF_average'] = averg
+    if 'parabola_fit_minutes' not in glucose_status:
+        dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
+        if iMax>= 0:
+            glucose_status['parabola_fit_minutes']      = round(parabs[iMax]['dur'], 1)
+            glucose_status['parabola_fit_correlation']  = parabs[iMax]['corr']
+            glucose_status['bg_acceleration']           = parabs[iMax]['a2'] * 2
+            glucose_status['parabola_fit_last_delta']   = parabs[iMax]['a1'] - parabs[iMax]['a2']
+            glucose_status['parabola_fit_next_delta']   = parabs[iMax]['a1'] + parabs[iMax]['a2']
+            glucose_status['parabola_fit_a0']           = parabs[iMax]['a0']
+            glucose_status['parabola_fit_a1']           = parabs[iMax]['a1']
+            glucose_status['parabola_fit_a2']           = parabs[iMax]['a2']
+            #print('   fit set:', str(glucose_status))
+        else:   # no fit
+            glucose_status['parabola_fit_correlation']  = 0
+            glucose_status['bg_acceleration']           = 0
+            glucose_status['parabola_fit_a2']           = 0
+            #print('no fit set:', str(glucose_status))
+    if 'parabola_fit_minutes' in glucose_status:
+        deltas[mills]['parabola_fit_minutes']    = glucose_status['parabola_fit_minutes']
+        deltas[mills]['parabola_fit_correlation']= glucose_status['parabola_fit_correlation']
+        deltas[mills]['parabola_fit_last_delta'] = glucose_status['parabola_fit_last_delta']
+        deltas[mills]['parabola_fit_next_delta'] = glucose_status['parabola_fit_next_delta']
+    if len(bg)!=len(loop_mills) :
         bg[-1] = (glucose_status['glucose'])            # overwrite as last loop was not finished
         bgTime[-1] = (glucose_status['date']/1000)      # time of bg value in seconds; was minutes
         #print ('\nbg data found in row '+str(lcount)+', total count='+str(len(bg)))
@@ -1047,7 +1049,7 @@ def scanLogfile(fn, entries):
                 break
             except PermissionError:
                 asleep = 10
-                log_msg('Your CSV-file seems blocked by other process. Checking again in '+str(asleep)+' sec.'+chr(7)) # sometimes I can hear that BELL
+                log_msg('\nYour CSV-file seems blocked by other process. Checking again in '+str(asleep)+' sec.'+chr(7)) # sometimes I can hear that BELL
                 time.sleep(asleep)
                 pdfCleared=True
             except FileNotFoundError:
@@ -1085,7 +1087,7 @@ def scanLogfile(fn, entries):
                             lf.Close()
                         except:
                             pass                # was already closed / had disappeared
-                        log_msg('waiting 10s for logfile housekeeping')
+                        log_msg('\nwaiting 10s for logfile housekeeping')
                         time.sleep(10)
                         lf = open(fn, 'r')
             if isZip:   zeile = str(zeile)[2:-3]# strip off the "'b....'\n" remaining from the bytes to str conversion
@@ -1158,7 +1160,7 @@ def scanLogfile(fn, entries):
                         elif dataTxt      == 'MicroBolusAllowed' :          get_MicroBolusAllowed(lcount, dataStr)
                         elif dataTxt      == 'Result: {"temp":"' :
                                                                             checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.6.1
-                                                                            cont = TreatLoop(dataStr[8:], log, lcount)
+                                                                            cont = TreatLoop(dataStr[8:], log, lcount, fn)
                                                                             if cont=='STOP' or cont=='SYNTAX':     return cont
                         #elif dataType == dataType_offset+145:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.7
                         #elif dataType == dataType_offset+147:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 Wolfgang Spänle
@@ -1173,7 +1175,7 @@ def scanLogfile(fn, entries):
                         Curly =  hole(sLine, 1+sOffset+len(Block2), '{', '}')
                         #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
                         if Curly.find('{"device":"openaps:')==0:   
-                            cont = TreatLoop(Curly, log, lcount)
+                            cont = TreatLoop(Curly, log, lcount, fn)
                             if cont=='STOP' or cont=='SYNTAX':     return cont
                     elif zeile.find('[NSClientPlugin.onStart$lambda-5():124]') > 0 :    ################## flag for V3.0dev
                         Curly =  hole(zeile, 5, '{', '}')
@@ -1182,7 +1184,7 @@ def scanLogfile(fn, entries):
                         #and Curly.find('"openaps":{"suggested":{')>0 :
                         if  Curly.find('"openaps":{"suggested":{')>0 :
                             #and 'lastTempAge' in SMBreason :   
-                            cont = TreatLoop(Curly, log, lcount)
+                            cont = TreatLoop(Curly, log, lcount, fn)
                             if cont=='STOP' or cont=='SYNTAX':     return cont
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
@@ -1190,7 +1192,7 @@ def scanLogfile(fn, entries):
                     if  Curly.find('{"device":"openaps:')==0 \
                     and Curly.find('"openaps":{"suggested":{')>0 :
                         #and 'lastTempAge' in SMBreason :   
-                        cont = TreatLoop(Curly, log, lcount)
+                        cont = TreatLoop(Curly, log, lcount, fn)
                         if cont=='STOP' or cont=='SYNTAX':     return cont
 
         except UnicodeDecodeError:              # needed because "for zeile in lf" does not work with AAPS 2.5 containing non-printing ASCII codes
@@ -1558,7 +1560,8 @@ def XYplots(loopCount, head1, head2, entries) :
     bbox = dict(boxstyle="round", fc="0.8")
     flowForward = dict(arrowstyle='<|-')                                                # points to current box
 
-    log_msg('Emulation finished; generating graphics pages\n')
+    if featured('LIST'):    log_msg('\nEmulation finished; generating graphics pages')
+    log_msg('\n')
     pdfFile = fn_first + '.' + varLabel + '.pdf'
     pdfCleared = False
     while True:                                                                         # wait if old pdf is still loaded in pdf viewer
@@ -1573,12 +1576,16 @@ def XYplots(loopCount, head1, head2, entries) :
             pdfCleared=True
         except FileNotFoundError:
             break
-    log_msg(head1)                                                                      # header row 1
-    log_msg(head2)                                                                      # header row 2
+    if featured('LIST'):
+        log_msg(head1)                                                                  # header row 1
+        log_msg(head2)                                                                  # header row 2
 
     with PdfPages(pdfFile) as pdf:
         for iFrame in range(0, maxframes):                                              # the loop instances
-            log_msg(entries[loop_mills[iFrame]].replace('.', my_decimal))               # print short table as heart beat
+            if featured('LIST'):
+                log_msg(entries[loop_mills[iFrame]].replace('.', my_decimal))           # print short table as heart beat
+            else:
+                log_msg('Emulation finished; generating graphics page at '+loop_label[iFrame], '\r')
             #fig, axes = plt.subplots(1, maxPlots, constrained_layout=True, figsize=(9, 15)) #6*maxPlots)  )          
             fig = plt.figure(constrained_layout=True, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
             #fig = plt.figure(constrained_layout=False, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
@@ -1917,7 +1924,7 @@ def XYplots(loopCount, head1, head2, entries) :
                     old_Thigh= drow
 
             pdf.savefig()
-            if not featured('pred'):                        # only 1 frame
+            if not featured('pred') and featured('LIST'):                        # only 1 frame
                 for i in range(iFrame+1,  len(entries)):
                     log_msg(entries[loop_mills[i]].replace('.', my_decimal))
                 if how_to_print!='GUI' and featured('PDF'):    plt.show()     # otherwise conflict with root.mainloop() in tkinter
@@ -2096,7 +2103,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 #print('fn_first =', wd + fnLabel)
                 #if how_to_print=='GUI':
                 #    fn_first_used.set(fn)
-            if not isAndroid:        log_msg ('Scanning logfile '+fn)
+                if not isAndroid:        log_msg ('\n')
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
             filecount += 1
@@ -2108,7 +2115,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         return 'Z', 0, '', '', 0, ''
     loopCount = len(loop_mills)
     if loopCount == 0 :
-        log_msg ('no entries found in logfile: "'+myseek+'"')
+        log_msg ('\nno entries found in logfile: "'+myseek+'"')
         #return     #sys.exit()
     log.write('END\n')
     log.close()
@@ -2428,7 +2435,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         #print("origSMB="+str(origSMB)+"\nemulSMB="+str(emulSMB))
         return loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
     
-def set_tty(printframe, txtbox, channel):               # for GIU
+def set_tty(printframe, txtbox, channel):                   # for GIU
     global how_to_print
     how_to_print = channel
     global runframe
@@ -2436,15 +2443,19 @@ def set_tty(printframe, txtbox, channel):               # for GIU
     global lfd
     lfd = txtbox
     
-def log_msg(msg):                                       # for GUI
+def log_msg(msg, eol='\n'):                                 # for GUI
     if how_to_print == 'GUI':
         lfd['state'] = 'normal'
-        lfd.insert('end', msg + '\n')
+        if eol == '\n':
+            lfd.insert('end', msg + '\n')
+        else:
+            lfd.delete('end-2c linestart', 'end-2c lineend+1c')   # cannot overwrite
+            lfd.insert('end', msg + '\n')     
         lfd.see('end')
         lfd['state'] = 'disabled'
-        runframe.update()                                                       # update frame display
+        runframe.update()                                   # update frame display
     else:
-        print(msg)
+        print(msg, end=eol)
 
 def sub_issue(msg):
     if how_to_print == 'GUI':
