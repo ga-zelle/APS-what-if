@@ -14,6 +14,18 @@ Shows examples starting from straightforward to very complex ones
 Examples can be used via copy/paste
 </details>
 
+<details><summary>How_to_create_the_autoISF_factor_plot.pdf</summary>
+This is a short guide how to generate the autoISF factors plot in your favorite spreadsheet tool. It starts from a ready made template in which you just overwrite the original data with the new emulator results. 
+  
+You find the EXCEL and LibreOffice templates in the top level folder
+</details>
+
+<details><summary>How-to-preview-autoISF-impact.pdf</summary>
+Explains how you can assess which feature of autoISF could have which impact if you had autoISF installed. As those features are includud in the emulator, ýou can have a preview before undertaking the journey to build and install autoISF.
+
+By running the emulator on the AAPS phone you can already get live hints when extra SMBs would be appropriate. This helps to build up experience and trust before going live with autoISF.
+</details>
+
 <details><summary>How_to_start_tuning_autoISF2.2.pdf</summary>
 This is an older document which guides you through the process of generating spreadsheet tables and graphs. These help in identifying which parameter to modify and provide a first estimate by how much.
 </details>
