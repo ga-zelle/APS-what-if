@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-05-02 00:00'
+    echo_msg['emulator_core.py'] = '2023-05-24 20:06'
     return echo_msg
 
 
@@ -2069,11 +2069,13 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                         sorted_fn[fnpseudo] = fn    #os.path.basename(fn)
                     #print(str(sorted_fn))
                     pass
+        if len(sorted_fn) == 0:
+            sorted_fn[myseek] = myseek              # in case of special naming use just that file
 
     filecount = 0
     wd = os.path.dirname(varFile)
     if isAndroid:       wd = wd + '/'
-    elif wd !='':       wd = wd + '/'           # needed for GUI method
+    elif wd !='':       wd = wd + '/'               # needed for GUI method
     #if wd == '':        wd = os.getcwd()
     for ps in sorted(sorted_fn):
         fn = sorted_fn[ps]
