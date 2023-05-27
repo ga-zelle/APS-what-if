@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-05-24 20:06'
+    echo_msg['emulator_core.py'] = '2023-05-27 02:32'
     return echo_msg
 
 
@@ -376,7 +376,7 @@ def setVariant(stmp):
                 elif myVal[woSTAIR+6:woSTAIR+9] == 'ISF':    myVal = STAIR_scan(stmp, myVal, woSTAIR, 3, STAIR_ISF)
                 elif myVal[woSTAIR+6:woSTAIR+9] == 'LTG':    myVal = STAIR_scan(stmp, myVal, woSTAIR, 3, STAIR_LTG)
                 elif myVal[woSTAIR+6:woSTAIR+9] == 'HTG':    myVal = STAIR_scan(stmp, myVal, woSTAIR, 3, STAIR_HTG)
-                else:                                        print('key', myVal[woSTAIR+6:woSTAIR+9], 'not found')
+                else:                                        sub_issue('key', myVal[woSTAIR+6:woSTAIR+9], 'not found')
 
             woSTAIR = myVal.find('STAIR')
             if woSTAIR >= 0:                                                        # get value from last valid step
@@ -623,7 +623,7 @@ def TreatLoop(Curly, log, lcount, fn):
         reason = suggest['reason']
         loop_mills.append(round(thisTime/1000, 1) )                 # from millis to secs
         loop_label.append(stmp[11:19] + stmp[-1])                   # include seconds to distinguish entries
-        #print('len loop_mills='+str(len(loop_mills))+'; len labels='+str(len(loop_label)))
+        #print('len loop_mills='+str(len(loop_mills))+'; len labels='+str(len(loop_label))+'; mills='+str(bgTime[-1]))
         bgTimeMap[loop_mills[-1]] = bgTime[-1]                      # bgTime used by loop at thisTime
         if 'insulinReq' in suggest:
             key = 'insulinReq'
@@ -832,15 +832,17 @@ def get_glucose_status(lcount, st) :                    # key = 80
     glucose_status = json.loads(Curly)
     glucose_status['row'] = lcount
     #print('entered glucose_status for row='+str(lcount)+'  loop_mills='+'loop_mills[-1]' + '  total count='+str(len(bg))+' with\n '+Curly)
+    #print('\n\n'+str(glucose_status))
     #print('entered glucose_status for row='+str(lcount)+'  total mills='+str(len(loop_mills))+ '  total BGs='+str(len(bg))+' with\n '+Curly)
     #print('='*20)
     #if len(bg)==len(loop_mills) :
     bg.append(glucose_status['glucose'])            # start next iteration
     mills = glucose_status['date']/1000             # time of bg value in seconds; was milliseconds
-    for i in range(100):                            # in case rth elp is executed 100 times before next CGM
-        mills += 0.0001
+    for i in range(100):                            # in case the loop is executed 100 times before next CGM
+        mills = round(mills+0.0001,4)
         if mills not in deltas:    break            # use bg_time with very small offset
     bgTime.append(mills)                            # time of bg value in seconds; was minutes
+    #print('after append in glucose', str(bgTime))
     deltas[mills] = {'bg':glucose_status['glucose'], 'delta':glucose_status['delta'], 'short':glucose_status['short_avgdelta'], 'long':glucose_status['long_avgdelta']}
     if 'dura_ISF_minutes' not in glucose_status:
         mins, averg = getHistBG(len(bg)-1, 0.05)
@@ -868,10 +870,14 @@ def get_glucose_status(lcount, st) :                    # key = 80
         deltas[mills]['parabola_fit_correlation']= glucose_status['parabola_fit_correlation']
         deltas[mills]['parabola_fit_last_delta'] = glucose_status['parabola_fit_last_delta']
         deltas[mills]['parabola_fit_next_delta'] = glucose_status['parabola_fit_next_delta']
-    if len(bg)!=len(loop_mills) :
-        bg[-1] = (glucose_status['glucose'])            # overwrite as last loop was not finished
-        bgTime[-1] = (glucose_status['date']/1000)      # time of bg value in seconds; was minutes
-        #print ('\nbg data found in row '+str(lcount)+', total count='+str(len(bg)))
+    #if len(bg)!=len(loop_mills) :
+    #    #print('before overwrite:\n'+str(loop_mills) + '\n'+str(bg) + '\n'+str(bgTime))
+    #    #bg[-1] = (glucose_status['glucose'])            # overwrite as last loop was not finished
+    #    #bgTime[-1] = (glucose_status['date']/1000)      # time of bg value in seconds; was minutes
+    #    #print('after overwrite:\n'+str(loop_mills) + '\n'+str(bg) + '\n'+str(bgTime))
+    #    #print ('\nbg data found in row '+str(lcount)+', total count='+str(len(bg)))
+    #    if mills>=1684843012 and mills<=1684843013:
+    #        print('deltas at '+str(mills), str(deltas[mills]))
     pass
 
 def get_iob_data(lcount, st, log) :                     # key = 81
@@ -1105,7 +1111,7 @@ def scanLogfile(fn, entries):
             lcount +=  1
             #print(zeile)
             if lcount>100000:  
-                print('no end found at row '+str(lcount)+ ' reading /'+zeile+'/')
+                sub_issue('no end found at row '+str(lcount)+ ' reading /'+zeile+'/')
                 return 'STOP'
             if len(zeile)>13:
                 headerKey = zeile[2] + zeile[5] + zeile[8] + zeile[12]
@@ -1448,6 +1454,22 @@ def populateColumn(tLast, array, weight, iFirst, loopCount):
         if weight != 1:     val = round(val,2)          # was autosense
         tLast += f'{val:>10}'
     return tLast
+
+def getBgTimeIndex(iFrame):
+    # for a given loop index return the related index in bgTime
+    #for bgIndex in range(iFrame, -1, -1):
+    glucTime = bgTimeMap[loop_mills[iFrame]]
+    LoopTime = loop_mills[iFrame]
+    #print('Loop time is'+str(LoopTime), '  glucose Time is', str(glucTime))
+    bgIndex = 0
+    for ele in bgTime:
+        if glucTime == ele: 
+            break
+        bgIndex += 1
+    #print(str(bgTime))
+    #for bgFrame in bgTime
+    #print(' bgIndex is: '+str(bgIndex), ' bgTime is: '+str(bgTime[bgIndex]), str(ele))
+    return bgIndex
     
 def XYplots(loopCount, head1, head2, entries) :
     import matplotlib.pyplot as plt
@@ -1649,14 +1671,15 @@ def XYplots(loopCount, head1, head2, entries) :
                         minmills = loop_mills[iFrame] - dura05 * 60
                         axbg.fill_between([bg_min,bg_max], minmills-2*thickness, loop_mills[iFrame]+2*thickness, fc='red', alpha=0.25)
                     if iFrame>1 and ( featured('fitsslope') or featured('bestslope')):  # show all fits
-                        dura70, slope70, slopes, iMax = getSlopeBG(iFrame)
+                        bgFrame = getBgTimeIndex(iFrame)
+                        dura70, slope70, slopes, iMax = getSlopeBG(bgFrame)
                         first_linear_fit = True
                         for i in slopes:
                             #print ('iFrame', str(iFrame), ' mit', str(i), 'hat', str(slopes[i]))
                             a = slopes[i]['a']
                             b = slopes[i]['b']
                             t1= bgTime[i]
-                            t2= bgTime[iFrame]
+                            t2= bgTime[bgFrame]
                             b1= b*t1+a
                             b2= b*t2+a
                             fitcolor = ['#c0c0c0',  'black']                            # grey, black
@@ -1670,7 +1693,8 @@ def XYplots(loopCount, head1, head2, entries) :
                             if isBest and featured('bestslope'):
                                 axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='best linear fit')   #best fit
                     if iFrame>2 and (featured('bestParabola') or featured('fitsParabola')): # show parabolas
-                        dura_p, delta_p, parabs, iMax = getBestParabolaBG(iFrame)
+                        bgFrame = getBgTimeIndex(iFrame)
+                        dura_p, delta_p, parabs, iMax = getBestParabolaBG(bgFrame)
                         first_parabola_fit = True
                         for i in parabs:
                             #print('  plotting', str(parabs[i]))
@@ -1682,15 +1706,15 @@ def XYplots(loopCount, head1, head2, entries) :
                             tfit = []
                             fitcolor = ['#ff00ff',  '#900090']                          # faint violett = magenta, dark violett
                             isBest = ( i==iMax)
-                            tx = bgTime[iFrame] +5*60                                   # window end time = +5min from last glucose
+                            tx = bgTime[bgFrame] +5*60                                   # window end time = +5min from last glucose
                             #if a2 != 0:
                             #    tminmax = -a1/(2*a2)+5*60                               # time of min or max +5min
                             #    tx = max(tx, tminmax)                                   # if min/max is ahead of bgTime
-                            while tx >= bgTime[iFrame]-dur*60:
-                                ti = (tx - bgTime[iFrame])/300
+                            while tx >= bgTime[bgFrame]-dur*60:
+                                ti = (tx - bgTime[bgFrame])/300
                                 bfit.append(a2*pow(ti,2) + a1*ti + a0)
                                 tfit.append(tx)
-                                #print('interim', str(i), str(tfit), str((bfit)))
+                                #print(str(iFrame),'interim', str(i), str(tfit), str((bfit)))
                                 tx += -2.5*60                                           # go  backwards in fit window
                             if not isBest and featured('fitsParabola'):
                                 axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])   # some Parabola
@@ -1774,7 +1798,7 @@ def XYplots(loopCount, head1, head2, entries) :
                         label = Levels['type']
                         SMBsource = Levels['source']
                         couleur = colFav[SMBsource]
-                        if 'minGuardBG1' not in Levels:    print(str(Levels))
+                        if 'minGuardBG1' not in Levels:    sub_issue(str(Levels))
                         minGuardBG = Levels['minGuardBG1']                                  # get maxin/only contributioon
                         SMBarrow = dict(arrowstyle='<|-|>', fc=couleur, ec=couleur)
                         if label == 'maxDelta' :
@@ -2148,11 +2172,15 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                     r_list += f'{longSlope[iFrame]:>7}{rateSlope[iFrame]:>6}'
                 if featured('fitsParabola') or featured('bestParabola'):
                     this_List = 23*' '
-                    #print(str(bgTimeMap))
+                    #print('\n\n'+str(thisTime), str(bgTimeMap))
                     if thisTime in bgTimeMap:
                         deltaTime = bgTimeMap[thisTime]
+                        #print('  '+str(deltaTime))
+                        #for ele in deltas:
+                        #    print('--> '+str(ele))
                         if deltaTime in deltas:
                             thisDelta = deltas[deltaTime]
+                            #print('    '+str(thisDelta))
                             if 'parabola_fit_minutes' in thisDelta:
                                 this_List = f'{thisDelta["parabola_fit_minutes"]:>7}{round(thisDelta["parabola_fit_last_delta"],2):>8}'
                                 this_List+= f'{round(thisDelta["parabola_fit_next_delta"],2):>8}'
@@ -2360,7 +2388,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     xyf.close()
     
     if len(entries) == 0:
-        print('\nNo loop data yet in fresh logfile')
+        sub_issue('\nNo loop data yet in fresh logfile')
         return 'Z',0, '', '', 0, ''
     else:                                               #  6
         head1 = '  UTC '
