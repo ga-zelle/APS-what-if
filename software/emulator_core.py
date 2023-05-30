@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-05-30 01:58'
+    echo_msg['emulator_core.py'] = '2023-05-30 02:05'
     return echo_msg
 
 
@@ -1951,7 +1951,7 @@ def XYplots(loopCount, head1, head2, entries) :
             if not featured('pred') and featured('LIST'):                        # only 1 frame
                 for i in range(iFrame+1,  len(entries)):
                     log_msg(entries[loop_mills[i]].replace('.', my_decimal))
-                if how_to_print!='GUI' and featured('PDF'):    plt.show()     # otherwise conflict with root.mainloop() in tkinter
+            if how_to_print!='GUI' and featured('PDF'):    plt.show()     # otherwise conflict with root.mainloop() in tkinter
             plt.close()                                     # end of current page
         #pdf.close()                                        # not needed due to "with ..." method triggered above
     pass
