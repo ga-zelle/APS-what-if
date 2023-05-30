@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-05-27 02:32'
+    echo_msg['emulator_core.py'] = '2023-05-30 01:58'
     return echo_msg
 
 
@@ -289,7 +289,6 @@ def setVariant(stmp):
     # first, do the AAPS standard assignments           ### variations are set in the <variant>.dat file
     new_parameter['maxDeltaRatio'] = 0.2                ### add'l parameter; AAPS is fix at 0.2
     new_parameter['SMBRatio'] = 0.5001                  ### add'l parameter; AAPS is fix at 0.5; I use 0.7 as no other rig interferes
-    new_parameter['thresholdRatio'] = 0.5               ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
     new_parameter['maxBolusIOBUsual'] = True            ### add'l parameter; AAPS is fix at True, but my basal is too low
     new_parameter['maxBolusIOBRatio'] = 1               ### add'l parameter; AAPS is fix at 1, but my basal is too low
     new_parameter['maxBolusTargetRatio'] = 1.001        ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
@@ -315,10 +314,12 @@ def setVariant(stmp):
     if 'meal_type_weight' not in profile:
         profile['meal_type_weight'] = 0                 ### not known before ai3.0
     if 'iob_threshold_percent' not in profile:
+    #   profile['gz_did_it'] = False                    ### flag for gz Full Loop prototyping
         profile['iob_threshold_percent'] = 100          ### not known before ai3.0
-    #    profile['gz_did_it'] = False                    ### flag for gz Full Loop prototyping
-    #else:
-    #    profile['gz_did_it'] = True                     ### flag for gz Full Loop prototyping
+        new_parameter['thresholdRatio'] = 0.5           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
+    else:
+        new_parameter['thresholdRatio'] = 0.6           ### add'l parameter; autoISF is fix at 0.6; I use 0.6 to lift the minimum 
+    #   profile['gz_did_it'] = True                     ### flag for gz Full Loop prototyping
     if 'profile_percentage' not in profile:
         profile['profile_percentage'] = 100             ### not known before ai3.0
     if 'enableSMB_EvenOn_OddOff' not in profile:
@@ -1664,6 +1665,7 @@ def XYplots(loopCount, head1, head2, entries) :
 
                 if featured('bg') :                                                     # plot bg
                     axbg.plot(bg,         bgTime,     linestyle='solid',  marker='o', color='red',    label='blood glucose')
+                    bgFrame = getBgTimeIndex(iFrame)
                     dura05, avg05 = getHistBG(iFrame, 0.05)                             # mins in 5% band
                     if dura05>1 and featured('range'):
                         bg_min = avg05 * (1-0.05)
@@ -1671,7 +1673,6 @@ def XYplots(loopCount, head1, head2, entries) :
                         minmills = loop_mills[iFrame] - dura05 * 60
                         axbg.fill_between([bg_min,bg_max], minmills-2*thickness, loop_mills[iFrame]+2*thickness, fc='red', alpha=0.25)
                     if iFrame>1 and ( featured('fitsslope') or featured('bestslope')):  # show all fits
-                        bgFrame = getBgTimeIndex(iFrame)
                         dura70, slope70, slopes, iMax = getSlopeBG(bgFrame)
                         first_linear_fit = True
                         for i in slopes:
@@ -1693,7 +1694,6 @@ def XYplots(loopCount, head1, head2, entries) :
                             if isBest and featured('bestslope'):
                                 axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='best linear fit')   #best fit
                     if iFrame>2 and (featured('bestParabola') or featured('fitsParabola')): # show parabolas
-                        bgFrame = getBgTimeIndex(iFrame)
                         dura_p, delta_p, parabs, iMax = getBestParabolaBG(bgFrame)
                         first_parabola_fit = True
                         for i in parabs:
@@ -2154,7 +2154,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             if thisTime not in entries:                 # holds the rows to be printed on Android or windows
                 r_list = loop_label[iFrame][:5]+'Z'
                 if featured('bg'):      
-                    r_list += f'{bg[iFrame]:>6}'
+                    r_list += f'{bg[getBgTimeIndex(iFrame)]:>6}'
                 if featured('target'):
                     r_list += f'{round((origTarLow[iFrame] + origTarHig[iFrame])/2,0):>8}'.replace(".0","")
                 if featured('iob'):     
@@ -2200,7 +2200,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         # ---   print the comparisons    -------------------------
         head1  = "  ;    ; ;     ;  bg ;  bg ; target; target; target; target;       ;      ;    "
         head2  = "  ; UTC; ; UNIX;accel;brake;   low ;  high ;  low  ;  high ;       ;      ;    "
-        head3  = "id; ime;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; act"
+        head3  = "id;time;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; act"
         
         head1 += "; auto; final; dura;     ; lin.fit; "
         head2 += "; sens;  ISF; min-; dura ;  min-  ; lin.fit"
@@ -2264,10 +2264,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 hour_offset += 24
             hour_new = eval(str(hour_offset)+"+1"+time_UTC[:2]) # e.g. 24+102=126
             time_new = str(hour_new)[1:3] + time_UTC[2:]        # e.g. '26'+':mm:ss'
-            tabz = f'{i:>3};{time_new};Z; {loop_mills[i]:>13}; {bg[i]:>4}; ' 
+            tabz = f'{i:>3};{time_new};Z; {loop_mills[i]:>13}; {bg[getBgTimeIndex(i)]:>4}; ' 
             if acceISF[i] < 1:
-                tabz += f'{bg[i]:>4}; '     # negative acceleration
-            else:                tabz += '    ; '             # positive acceleration
+                tabz += f'{bg[getBgTimeIndex(i)]:>4}; '         # negative acceleration
+            else:                tabz += '    ; '               # positive acceleration
             tabz += f'{origTarLow[i]:>4};{origTarHig[i]:>3};{emulTarLow[i]:>4};{emulTarHig[i]:>3}; ' 
             tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(activity[i]/1000,3):>6}; ' 
             tabz += f'{round(origAs_ratio[i]/10,2):>5};'                # {round(emulAs_ratio[i]/10,2):>5};' 
@@ -2341,21 +2341,21 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         sepLine = ''
         sepLine += 265 * '-'
         sepLine += '\n'
-        tabz = 'Minimum:;;;; '+ f'{min_bg:>22}' \
+        tabz = ';Minimum:;;; '+ f'{min_bg:>22}' \
              + f';;;;;;;;;{round(min_origAS/10,2):>45}; {round(min_origAI/10,2):>5}' \
              + f';;;;;;;;;{round(min_emulAS/10,2):>67}' \
              + f';{round(min_acceISF,2):>6};{round(min_BZ_ISF,2):>6};{round(min_pp_ISF,2):>6};{round(min_Delta_ISF,2):>6};{round(min_dura_ISF,2):>5}' \
              + f';;{round(min_origISF,1):>11};{round(min_profISF,1):>6};{round(min_emulISF,1):>6}' \
              + f';;;;;{round(min_origSMB,1):>35}; {round(min_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
-        tabz = 'Maximum:;;;; '+ f'{max_bg:>22}' \
+        tabz = ';Maximum:;;; '+ f'{max_bg:>22}' \
              + f';;;;;;;;;{round(max_origAS/10,2):>45}; {round(max_origAI/10,2):>5}' \
              + f';;;;;;;;;{round(max_emulAS/10,2):>67}' \
              + f';{round(max_acceISF,2):>6};{round(max_BZ_ISF,2):>6};{round(max_pp_ISF,2):>6};{round(max_Delta_ISF,2):>6};{round(max_dura_ISF,2):>5}' \
              + f';;{round(max_origISF,1):>11};{round(max_profISF,1):>6};{round(max_emulISF,1):>6}' \
              + f';;;;;{round(max_origSMB,1):>35}; {round(max_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
-        tabz = 'Totals:'+ ';'*37+f'{round(origSMBsum,1):>229}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
+        tabz = ';Totals:'+ ';'*36+f'{round(origSMBsum,1):>229}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
 
         # ---   list all types of delta information    -----------
