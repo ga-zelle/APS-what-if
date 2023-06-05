@@ -30,12 +30,6 @@ By running the emulator on the AAPS phone you can already get live hints when ex
 This is an older document which guides you through the process of generating spreadsheet tables and graphs. These help in identifying which parameter to modify and provide a first estimate by how much.
 </details>
 
-<details><summary>How-to-preview-autoISF-impact.pdf</summary>
-Explains how you can assess which feature of autoISF could have which impact if you had autoISF installed. As those features are includud in the emulator, ýou can have a preview before undertaking the journey to build and install autoISF.
-
-By running the emulator on the AAPS phone you can already get live hints when extra SMBs would be appropriate. This helps to build up experience and trust before going live with autoISF.
-</details>
-
 <details><summary>Installation guide.pdf</summary>
 Starts from getting and installing the required files and 
   
