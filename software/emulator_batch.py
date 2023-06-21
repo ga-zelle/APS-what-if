@@ -12,7 +12,7 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2023-01-28 22:58'
+    echo_msg['emulator_batch.py'] = '2023-06-21 14:58'
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
@@ -235,6 +235,10 @@ if IsAndroid :
     for cfgFile in cfgF:
         items[str(fcount)] = os.path.basename(cfgFile)
         fcount += 1
+    if fcount == 1:
+        print('\nWARNING: config file is missing\nin logfile folder\nget config file and restart app')
+        ans = input('\npress ENTER')
+        sys.exit()
     pick = "1"
     pressed_button = "N"
     while True:

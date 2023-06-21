@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-05-30 02:05'
+    echo_msg['emulator_core.py'] = '2023-06-08 12:35'
     return echo_msg
 
 
@@ -292,7 +292,6 @@ def setVariant(stmp):
     new_parameter['maxBolusIOBUsual'] = True            ### add'l parameter; AAPS is fix at True, but my basal is too low
     new_parameter['maxBolusIOBRatio'] = 1               ### add'l parameter; AAPS is fix at 1, but my basal is too low
     new_parameter['maxBolusTargetRatio'] = 1.001        ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
-    new_parameter['insulinCapBelowTarget'] = False      ### add'l parameter; AAPS is fix at False; enable capping below
     new_parameter['CapFactor'] = 0                      ### add'l parameter; AAPS is fix at 0; recently I used 4, but try 5
     new_parameter['CheckLibreError'] = 'cgmFlatMinutes' in profile   ### add'l parameter: autoISF  2.2.8 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
     new_parameter['AAPS_Version'] = AAPS_Version        ### place it before so it could be modified later
@@ -317,8 +316,10 @@ def setVariant(stmp):
     #   profile['gz_did_it'] = False                    ### flag for gz Full Loop prototyping
         profile['iob_threshold_percent'] = 100          ### not known before ai3.0
         new_parameter['thresholdRatio'] = 0.5           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
+        new_parameter['insulinCapBelowTarget'] = False  ### add'l parameter; AAPS is fix at False; enable capping below
     else:
-        new_parameter['thresholdRatio'] = 0.6           ### add'l parameter; autoISF is fix at 0.6; I use 0.6 to lift the minimum 
+        new_parameter['thresholdRatio'] = 0.6           ### add'l parameter; autoISF is fix at 0.5; I use 0.6 to lift the minimum 
+        new_parameter['insulinCapBelowTarget'] = True   ### add'l parameter; AAPS is fix at False; enable capping below
     #   profile['gz_did_it'] = True                     ### flag for gz Full Loop prototyping
     if 'profile_percentage' not in profile:
         profile['profile_percentage'] = 100             ### not known before ai3.0

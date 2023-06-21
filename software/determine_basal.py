@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-05-28 16:33'
+    echo_msg['determine_basal.py'] = '2023-06-08 12:35'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -260,9 +260,9 @@ def loop_smb(microBolusAllowed, profile, iob_data, iobTH_reduction_ratio, Flows)
                 Flows.append(dict(title="Full Loop modified max_iob "+str(profile['max_iob'])+" to effectively "+str(round(profile['max_iob']*iobTH_reduction_ratio,2))+" due to profile % and/or exercise mode", indent='1', adr='loop_222'))
                 msg = "effective maxIOB " + str(round(profile['max_iob']*iobTH_reduction_ratio,2))
             else :
-                msg = "maxIOB "+ str(profile['max_iob'])
-            console_error("SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is more than "+str(iobTHeffective)+"% of "+msg)
-            Flows.append(dict(title="SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is more than "+str(iobTHeffective)+"% of "+msg, indent='1', adr='loop_227'))
+                msg = "maxIOB "+ str(short(profile['max_iob']))
+            console_error("SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is more than "+str(short(iobTHeffective))+"% of "+msg)
+            Flows.append(dict(title="SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is more than "+str(short(iobTHeffective))+"% of "+msg, indent='1', adr='loop_227'))
             console_error("Full Loop pausing")
             return "iobTH"
         else :
