@@ -12,7 +12,7 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2023-06-21 14:58'
+    echo_msg['emulator_batch.py'] = '2023-07-13 01:15'
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
@@ -388,6 +388,9 @@ else:                                                                           
         t_stoppLabel = '2099-00-00T00:00:00Z'       # defaults to end of centuary, i.e. open end
         m_default = ' (default)'
     m += '\nEnd of time window    ' + t_stoppLabel + m_default
+    if len(sys.argv)==7:
+        # load the emulated bg history from dialog database
+        m += '\nBG_emul data table    t_'+ sys.argv[6]
     m += '\n' + '='*66 + '\n'
 
 #print ('evaluate from '+t_startLabel+' up to '+t_stoppLabel)

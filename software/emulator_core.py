@@ -23,9 +23,8 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-06-08 12:35'
+    echo_msg['emulator_core.py'] = '2023-11-24 17:59'
     return echo_msg
-
 
 def hole(sLine, Ab, Auf, Zu):
     #E extrahiere Substring ab der Stelle "ab"
@@ -52,7 +51,6 @@ def hole(sLine, Ab, Auf, Zu):
 
 def GetStr(Curly, Ab, Key):
     #E extrahiere Substring für Flag "Key" ab der Stelle Ab
-
     wo	= Curly[Ab:].find('"' + Key +'"') + Ab
     if wo < Ab:
         Found = ''
@@ -64,7 +62,6 @@ def GetStr(Curly, Ab, Key):
 
 def GetValStr(Curly, Ab, Key):
     #E extrahiere Number as String für Flag "Key" ab der Stelle Ab
-
     wo	= Curly[Ab:].find('"' + Key +'"') + Ab
     if wo < Ab:
         Found = ''
@@ -76,7 +73,6 @@ def GetValStr(Curly, Ab, Key):
 
 def GetUnquotedStr(Curly, Ab, Key):
     #E extract unquoted String für Flag "Key" ab der Stelle Ab up to next COMMA
-
     wo	= Curly[Ab:].find(Key) + Ab
     if wo < Ab:
         Found = ''
@@ -273,6 +269,7 @@ def STAIR_scan(stmp, myVal, woSTAIR, type_len, STAIR_json):
 
 def setVariant(stmp):
     # set the what-if scenario
+    #print('entered setVariant with stmp='+str(stmp))
     global autosens_data
     global glucose_status
     global bg
@@ -280,60 +277,75 @@ def setVariant(stmp):
     global iob_data
     global meal_data
     global profile
+    global new_parameter
     ####################################################################################################################################
     # additional parameters collected here
     # these need an according modification in "determine_basal.py"
     #rofile['use_autoisf'] = False                      ### not enabled in standard AAPS and not even available
     new_parameter = {}                                  
     temp          = {}                                  ### holds interim values in shorter notation
-    # first, do the AAPS standard assignments           ### variations are set in the <variant>.dat file
-    new_parameter['maxDeltaRatio'] = 0.2                ### add'l parameter; AAPS is fix at 0.2
-    new_parameter['SMBRatio'] = 0.5001                  ### add'l parameter; AAPS is fix at 0.5; I use 0.7 as no other rig interferes
-    new_parameter['maxBolusIOBUsual'] = True            ### add'l parameter; AAPS is fix at True, but my basal is too low
-    new_parameter['maxBolusIOBRatio'] = 1               ### add'l parameter; AAPS is fix at 1, but my basal is too low
-    new_parameter['maxBolusTargetRatio'] = 1.001        ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
-    new_parameter['CapFactor'] = 0                      ### add'l parameter; AAPS is fix at 0; recently I used 4, but try 5
-    new_parameter['CheckLibreError'] = 'cgmFlatMinutes' in profile   ### add'l parameter: autoISF  2.2.8 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
-    new_parameter['AAPS_Version'] = AAPS_Version        ### place it before so it could be modified later
-    new_parameter['LessSMBatModerateBG'] = False        ### additional parameter; AAPS is fix at False; reduce SMB if ...
-    new_parameter['LessSMBFactor'] = 2.0                ### eine alte Gewichtung ???
-    new_parameter['LessSMBbelow'] = profile['max_bg']+10.0                 ### ... bg below this value
-    if 'enable_autoISF' not in profile:
-        profile['enable_autoISF'] = False               ### not known before ai2.2.x
-    if 'smb_delivery_ratio' not in profile:
-        profile['smb_delivery_ratio'] = 0.5             ### not known before ai2.2.6
-    if 'smb_delivery_ratio_min' not in profile:
-        profile['smb_delivery_ratio_min'] = 0.5         ### not known before ai2.2.6; use recommendation
-    if 'smb_delivery_ratio_max' not in profile:
-        profile['smb_delivery_ratio_max'] = 0.9         ### not known before ai2.2.6; use recommendation
-    if 'smb_delivery_ratio_bg_range' not in profile:
-        profile['smb_delivery_ratio_bg_range'] = 0      ### not known before ai2.2.6; keep disabled
-    if 'iobTHtolerance' not in new_parameter:
-        new_parameter['iobTHtolerance'] = 130           ### not known before ai3.0
-    if 'meal_type_weight' not in profile:
-        profile['meal_type_weight'] = 0                 ### not known before ai3.0
-    if 'iob_threshold_percent' not in profile:
-    #   profile['gz_did_it'] = False                    ### flag for gz Full Loop prototyping
-        profile['iob_threshold_percent'] = 100          ### not known before ai3.0
-        new_parameter['thresholdRatio'] = 0.5           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
-        new_parameter['insulinCapBelowTarget'] = False  ### add'l parameter; AAPS is fix at False; enable capping below
-    else:
-        new_parameter['thresholdRatio'] = 0.6           ### add'l parameter; autoISF is fix at 0.5; I use 0.6 to lift the minimum 
-        new_parameter['insulinCapBelowTarget'] = True   ### add'l parameter; AAPS is fix at False; enable capping below
-    #   profile['gz_did_it'] = True                     ### flag for gz Full Loop prototyping
-    if 'profile_percentage' not in profile:
-        profile['profile_percentage'] = 100             ### not known before ai3.0
-    if 'enableSMB_EvenOn_OddOff' not in profile:
-        profile['enableSMB_EvenOn_OddOff'] = False      ### not known before ai2.2.7
-    if 'enableSMB_EvenOn_OddOff_always' not in profile:
-        profile['enableSMB_EvenOn_OddOff_always'] = False  ### not known before ai2.2.8
-    if 'enable_pp_ISF_always' not in profile:
-        profile['enable_pp_ISF_always'] = False         ### not known before ai2.2.7
-    if 'enable_dura_ISF_with_COB' not in profile:
-        profile['enable_dura_ISF_with_COB'] = False     ### not known before without ai
-    if AAPS_Version == '<2.7':                          
-        profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
-        profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
+    if (stmp != '1900-01-01T00:00:00') :
+        # first, do the AAPS standard assignments           ### variations are set in the <variant>.dat file
+        new_parameter['maxDeltaRatio'] = 0.2                ### add'l parameter; AAPS is fix at 0.2
+        new_parameter['SMBRatio'] = 0.5001                  ### add'l parameter; AAPS is fix at 0.5; I use 0.7 as no other rig interferes
+        new_parameter['maxBolusIOBUsual'] = True            ### add'l parameter; AAPS is fix at True, but my basal is too low
+        new_parameter['maxBolusIOBRatio'] = 1               ### add'l parameter; AAPS is fix at 1, but my basal is too low
+        new_parameter['maxBolusTargetRatio'] = 1.001        ### add'l parameter; AAPS is fix at 1, bit i saw rounding problems otherwise
+        new_parameter['CapFactor'] = 0                      ### add'l parameter; AAPS is fix at 0; recently I used 4, but try 5
+        new_parameter['CheckLibreError'] = 'cgmFlatMinutes' in profile   ### add'l parameter: autoISF  2.2.8 is at True for the stupid Libre CGM error handler, but Emulator skips the error in original
+        new_parameter['AAPS_Version'] = AAPS_Version        ### place it before so it could be modified later
+        new_parameter['LessSMBatModerateBG'] = False        ### additional parameter; AAPS is fix at False; reduce SMB if ...
+        new_parameter['LessSMBFactor'] = 2.0                ### eine alte Gewichtung ???
+        new_parameter['LessSMBbelow'] = profile['max_bg']+10.0                 ### ... bg below this value
+        
+        gz_proto  = 'full_basal_exercise_target' in profile
+        if gz_proto:
+            if 'thresholdRatio' not in new_parameter:
+                new_parameter['thresholdRatio'] = 0.6           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
+            if 'insulinCapBelowTarget' not in new_parameter:
+                new_parameter['insulinCapBelowTarget'] = True   ### add'l parameter; AAPS is fix at False; enable capping below
+        if 'enable_autoISF' not in profile:
+            profile['enable_autoISF'] = False               ### not known before ai2.2.x
+        if 'smb_delivery_ratio' not in profile:
+            profile['smb_delivery_ratio'] = 0.5             ### not known before ai2.2.6
+        if 'smb_delivery_ratio_min' not in profile:
+            profile['smb_delivery_ratio_min'] = 0.5         ### not known before ai2.2.6; use recommendation
+        if 'smb_delivery_ratio_max' not in profile:
+            profile['smb_delivery_ratio_max'] = 0.9         ### not known before ai2.2.6; use recommendation
+        if 'smb_delivery_ratio_bg_range' not in profile:
+            profile['smb_delivery_ratio_bg_range'] = 0      ### not known before ai2.2.6; keep disabled
+        if 'iobTHtolerance' not in new_parameter:
+            new_parameter['iobTHtolerance'] = 130           ### not known before ai3.0
+        if 'insulinCapBelowTarget' not in new_parameter:
+            new_parameter['insulinCapBelowTarget'] = False  ### add'l parameter; AAPS is fix at False; enable capping below
+        if 'meal_type_weight' not in profile:
+            profile['meal_type_weight'] = 0                 ### not known before ai3.0
+        if 'meal_addon' not in profile:
+            profile['meal_addon'] = 0                       ### not known generally
+        if 'iob_threshold_percent' not in profile:
+            profile['iob_threshold_percent'] = 100          ### not known before ai3.0
+        if 'thresholdRatio' not in new_parameter:
+            new_parameter['thresholdRatio'] = 0.5           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
+        if 'profile_percentage' not in profile:
+            profile['profile_percentage'] = 100             ### not known before ai3.0
+        if 'enableSMB_EvenOn_OddOff' not in profile:
+            profile['enableSMB_EvenOn_OddOff'] = False      ### not known before ai2.2.7
+        if 'enableSMB_EvenOn_OddOff_always' not in profile:
+            profile['enableSMB_EvenOn_OddOff_always'] = False  ### not known before ai2.2.8
+        if 'enable_pp_ISF_always' not in profile:
+            profile['enable_pp_ISF_always'] = False         ### not known before ai2.2.7
+        if 'enable_dura_ISF_with_COB' not in profile:
+            profile['enable_dura_ISF_with_COB'] = False     ### not known before without ai
+        if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
+            profile['activity_detection'] = False       ### not known before without ai
+        if 'nightly_inactivity_detection' not in profile:
+            profile['nightly_inactivity_detection'] = False
+        if 'activity_idle_start' not in profile:
+            profile['activity_idle_start'] = 0
+            profile['activity_idle_end'] = 0
+        if AAPS_Version == '<2.7':                          
+            profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
+            profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
     ####################################################################################################################################
     STAIR    = {}                                                   # for general, profile like definitions
     STAIR_BAS= {}                                                   # for profile definition of basal rate
@@ -369,7 +381,7 @@ def setVariant(stmp):
                 myVal   = zeile[:woEndVal]
             if myVal != '':
                 while myVal[-1] == ' ' :    myVal = myVal[:-1]                      # truncate trailing BLANKS
-            #print('['+myArray+'], ['+myItem+'], ['+myVal+']')
+            #print(zeile, '['+myArray+'], ['+myItem+'], ['+myVal+']')
            
             woSTAIR = myVal.find('STAIR_')
             if woSTAIR >= 0:                                                        # get value from last valid step
@@ -473,6 +485,18 @@ def setVariant(stmp):
 
             logmsg = 'appended new entry to'
             validRow = True
+            if   myArray == 'new_parameter' :                                         # allow also string type assignments like "<V2.7"
+                if myItem in new_parameter :
+                    logmsg = 'edited old value of '+str(new_parameter[myItem])+' in'
+                if myVal[0] == '"' :
+                    new_parameter[myItem] =      myVal[1:-1]                        # string variable
+                else:
+                    new_parameter[myItem] = eval(myVal)                             # normal case of numeric or booolean variable
+                logres = str(new_parameter[myItem])
+                
+                #if myItem == 'FSL_min_dur' and stmp=='1900-01-01T00:00:00':
+            if stmp=='1900-01-01T00:00:00':
+                    return False                                                    # end of pre-scan
             if   myArray == 'autosens_data' :
                 if myItem in autosens_data :
                     logmsg = 'edited old value of '+str(autosens_data[myItem])+' in'
@@ -508,14 +532,6 @@ def setVariant(stmp):
                     logmsg = 'edited old value of '+str(temp[myItem])+' in'
                 temp[myItem] = eval(myVal)
                 logres = str(temp[myItem])
-            elif myArray == 'new_parameter' :                                       # allow also string type assignments like "<V2.7"
-                if myItem in new_parameter :
-                    logmsg = 'edited old value of '+str(new_parameter[myItem])+' in'
-                if myVal[0] == '"' :
-                    new_parameter[myItem] =      myVal[1:-1]                        # string variable
-                else:
-                    new_parameter[myItem] = eval(myVal)                             # normal case of numeric or booolean variable
-                logres = str(new_parameter[myItem])
             elif myArray == 'STAIR' :
                 STAIR[myItem] = eval(myVal)
                 logres = myVal
@@ -546,28 +562,34 @@ def setVariant(stmp):
             elif myArray == 'POLYGON' :
                 POLYGON.append((eval(myItem), eval(myVal)) )
                 logres = myVal
-            else:
+            elif myArray != 'new_parameter':
                 validRow = False
+                varlog.write(myArray, 'is an inrecognised array/json/keyword')
         
-            if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
-            else:           varlog.write('not actioned: ['+myArray+'], ['+myItem+'], ['+myVal[:-1]+']'+'\n')
+            if (stmp != '1900-01-01T00:00:00') :
+                if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
+                else:           varlog.write('not actioned: ['+myArray+'], ['+myItem+'], ['+myVal[:-1]+']'+'\n')
         except: # catch *all* exceptions
             e = sys.exc_info()[0]
-            varlog.write("*******\nProblem in VDF-file in row "+str(ocount)+" reading\n"+orig_zeile+"\nerror message is:"+str(e)+"\n*******\n")
-            sub_issue('error found while processing VDF file. For details, see file "*.'+varLabel+'.log"')
+            if (stmp == '1900-01-01T00:00:00') :
+                print("*******\nProblem in VDF-file in row "+str(ocount)+" reading\n"+orig_zeile+"\nerror message is:"+str(e)+"\n*******\n")
+            else:
+                varlog.write("*******\nProblem in VDF-file in row "+str(ocount)+" reading\n"+orig_zeile+"\nerror message is:"+str(e)+"\n*******\n")
+                sub_issue('error found while processing VDF file. For details, see file "*.'+varLabel+'.log"')
             syntax_error = True
                     
     ####################################################################################################################################
     # final clean up
     #ew_parameter['AAPS_Version'] = AAPS_Version                ### flag to handle differences in determine-basal
-    profile['new_parameter'] = new_parameter                    ### use profile as piggyback to get parameters into determine_basal
-    bg[-1] = glucose_status['glucose']                          ### just in case it got changed 
-    global emulTarLow
-    global emulTarHig
-    emulTarLow[-1] = profile['min_bg']                          ### please do not touch
-    emulTarHig[-1] = profile['max_bg']                          ### please do not touch
-    global emulAs_ratio
-    emulAs_ratio.append(autosens_data['ratio']*10)
+    if (stmp != '1900-01-01T00:00:00') :
+        profile['new_parameter'] = new_parameter                ### use profile as piggyback to get parameters into determine_basal
+        bg[-1] = glucose_status['glucose']                      ### just in case it got changed 
+        global emulTarLow
+        global emulTarHig
+        emulTarLow[-1] = profile['min_bg']                      ### please do not touch
+        emulTarHig[-1] = profile['max_bg']                      ### please do not touch
+        global emulAs_ratio
+        emulAs_ratio.append(autosens_data['ratio']*10)
     return syntax_error
 
 def getOrigPred(predBGs):
@@ -579,7 +601,7 @@ def getOrigPred(predBGs):
 
 def TreatLoop(Curly, log, lcount, fn):
     global SMBreason, newLoop
-    global loop_mills, loop_label, bgTimeMap
+    global loop_mills, loop_label, bgTimeMap, bgTime, bg
     global origInsReq
     global origSMB, emulSMB
     global origMaxBolus, emulMaxBolus
@@ -620,7 +642,11 @@ def TreatLoop(Curly, log, lcount, fn):
             SMBreason = {}                                          # clear for first filtered debug list
             SMBreason['script'] = '---------- Script Debug --------------------\n'
             return 'MORE'       
-        if t_stoppLabel < stmp :            return 'STOP'           # too late; send quit signal
+        if t_stoppLabel < stmp :
+            bgTime.pop()
+            bg.pop()
+            #bgTimeMap.pop()
+            return 'STOP'           # too late; send quit signal
         thisTime = ConvertSTRINGooDate(stmp)
         reason = suggest['reason']
         loop_mills.append(round(thisTime/1000, 1) )                 # from millis to secs
@@ -850,7 +876,7 @@ def get_glucose_status(lcount, st) :                    # key = 80
         mins, averg = getHistBG(len(bg)-1, 0.05)
         glucose_status['dura_ISF_minutes'] = mins
         glucose_status['dura_ISF_average'] = averg
-    if 'parabola_fit_minutes' not in glucose_status:
+    if 'parabola_fit_minutes' not in glucose_status or 'FSL_min_dur' in new_parameter:
         dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
         if iMax>= 0:
             glucose_status['parabola_fit_minutes']      = round(parabs[iMax]['dur'], 1)
@@ -1135,7 +1161,7 @@ def scanLogfile(fn, entries):
                         dataType= eval(Block2[key_anf+2:key_end])
                         dataStr = sLine[sLine.find(']: ')+3:]
                         dataTxt = dataStr[:17]                              # make it dataTxt based rather than dataType (more robust)
-                        if dataType_offset <-99:                            # not yet initialized for known AAPS version
+                        if dataType_offset <-99 and newLoop:                            # not yet initialized for known AAPS version
                             if   dataType == 75 \
                             and newLoop :                                   # V 2.3 ?
                                 log_msg('\nSorry, cannot extract required data from logfiles before AAPS version 2.5\n')
@@ -1143,6 +1169,7 @@ def scanLogfile(fn, entries):
                             dataType_offset = dataType-79                   # "0" was lowest in V2.5.1
                             if dataType_offset >= 15:                       AAPS_Version = '2.7'    # same as 2.8
                             elif dataType_offset < 0:                       AAPS_Version = '2.7'    # same as 3.0
+                            elif dataType_offset >=2:                       AAPS_Version = '2.7'    # v 3.2
                             #elif dataType == 79:    dataType_offset =  0    # V 2.5.1
                             #elif dataType == 80:    dataType_offset =  1    # V 2.6.1
                             #elif dataType == 94:    dataType_offset = 15    # V 2.8.0    >>> Invoking detemine_basal <<< / Wolfgang Spänle
@@ -1361,7 +1388,10 @@ def getBestParabolaBG(iFrame):
 ##  y = a2*x^2 + a1*x + a0      or      
 ##  y = a*x^2  + b*x  + c       respectively
 
-    FSL_min_dur = 10                        # duration must be longer if BG measured by the minute
+    if 'FSL_min_dur' in new_parameter:
+        FSL_min_dur = new_parameter['FSL_min_dur']
+    else:
+        FSL_min_dur = 10                    # duration must be longer if BG measured by the minute
     if iFrame<3 or bgTime[iFrame]-bgTime[0] <= FSL_min_dur*60:  return 0,0, {}, -1    # first 3 points make a trivial parabola
     
     corrMin = 0.90                          # go backwards until the correlation coefficient goes below
@@ -1486,10 +1516,6 @@ def XYplots(loopCount, head1, head2, entries) :
     if len(loop_mills) < len(origMaxBolus)  :   origMaxBolus.pop()
     if len(loop_mills) < len(origSMB)       :   origSMB.pop()
     if len(loop_mills) < len(origBasal)     :   origBasal.pop()
-    #f len(loop_mills) < len(longDelta)     :   longDelta.pop()
-    #f len(loop_mills) < len(avgDelta)      :   avgDelta.pop()
-    #f len(loop_mills) < len(longSlope)     :   longSlope.pop()
-    #f len(loop_mills) < len(rateSlope)     :   rateSlope.pop()
     if len(loop_mills) < len(origISF)       :   origISF.pop()
     if len(loop_mills) < len(profISF)       :   profISF.pop()
     if len(loop_mills) < len(autoISF)       :   autoISF.pop()
@@ -1584,7 +1610,7 @@ def XYplots(loopCount, head1, head2, entries) :
     bbox = dict(boxstyle="round", fc="0.8")
     flowForward = dict(arrowstyle='<|-')                                                # points to current box
 
-    if featured('LIST'):    log_msg('\nEmulation finished; generating graphics pages')
+    if featured('LIST') and maxPlots>0:    log_msg('\nEmulation finished; generating graphics pages')
     log_msg('\n')
     pdfFile = fn_first + '.' + varLabel + '.pdf'
     pdfCleared = False
@@ -1600,359 +1626,363 @@ def XYplots(loopCount, head1, head2, entries) :
             pdfCleared=True
         except FileNotFoundError:
             break
-    if featured('LIST'):
+    if featured('LIST') and maxPlots>0:
         log_msg(head1)                                                                  # header row 1
         log_msg(head2)                                                                  # header row 2
 
     with PdfPages(pdfFile) as pdf:
         for iFrame in range(0, maxframes):                                              # the loop instances
-            if featured('LIST'):
+            if featured('LIST') and maxPlots>0:
                 log_msg(entries[loop_mills[iFrame]].replace('.', my_decimal))           # print short table as heart beat
+            if maxPlots == 0:
+                log_msg('\nno plot options active')
             else:
                 log_msg('Emulation finished; generating graphics page at '+loop_label[iFrame], '\r')
-            #fig, axes = plt.subplots(1, maxPlots, constrained_layout=True, figsize=(9, 15)) #6*maxPlots)  )          
-            fig = plt.figure(constrained_layout=True, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
-            #fig = plt.figure(constrained_layout=False, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
-            gs  = fig.add_gridspec(1,maxPlots)                                          # 1 horizontal; 1+2+6 vertical strips
-            fig.set_constrained_layout_pads(w_pad=0., h_pad=0., hspace=0., wspace=0.)   # space to edge and between frames
-            fig.suptitle('\nCompare original "' + fn + '" vs emulation case "' + varLabel + '"\n', weight='bold')    # incl. <CR> for space below Header
-            if frameIns :                                                               # anything related to insulin
-                axin = fig.add_subplot(gs[0,0])                                         # 1 strip wide
-                axin.xaxis.label.set_color('blue')
-                axin.tick_params(axis='x', colors='blue')
-                axin.set_xlabel('Insulin', weight='bold')
-                if featured('pred'):
-                    axin.set_ylim(loop_mills[0]+thickness*2+yRange*1.1, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame + 10% (45min) space for BG labels
-                else:
-                    axin.set_ylim(loop_mills[-1]+thickness*2, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame
-                axin.set_yticks(yTicks)
-                axin.set_yticklabels(yLabels)
+                #fig, axes = plt.subplots(1, maxPlots, constrained_layout=True, figsize=(9, 15)) #6*maxPlots)  )          
+                fig = plt.figure(constrained_layout=True, figsize=(2.2*max(6,maxPlots), 11))# w, h paper size in inches; double width if no flowchart
+                gs  = fig.add_gridspec(1,maxPlots)                                          # 1 horizontal; 1+2+6 vertical strips
+                fig.set_constrained_layout_pads(w_pad=0., h_pad=0., hspace=0., wspace=0.)   # space to edge and between frames
+                fig.suptitle('\nCompare original "' + fn + '" vs emulation case "' + varLabel + '"\n', weight='bold')    # incl. <CR> for space below Header
+                if frameIns :                                                               # anything related to insulin
+                    axin = fig.add_subplot(gs[0,0])                                         # 1 strip wide
+                    axin.xaxis.label.set_color('blue')
+                    axin.tick_params(axis='x', colors='blue')
+                    axin.set_xlabel('Insulin', weight='bold')
+                    if featured('pred'):
+                        axin.set_ylim(loop_mills[0]+thickness*2+yRange*1.1, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame + 10% (45min) space for BG labels
+                    else:
+                        axin.set_ylim(loop_mills[-1]+thickness*2, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame
+                    axin.set_yticks(yTicks)
+                    axin.set_yticklabels(yLabels)
 
-                if featured('insReq') :
-                    axin.plot(emulInsReq, loop_mills, linestyle='None',  marker='o', color='red',   label='insulin Req, emulated')
-                    axin.plot(origInsReq, loop_mills, linestyle='solid', marker='.', color='orange',label='insulin Req, original')
-                if featured('maxBolus') :
-                    axin.plot(emulMaxBolus,loop_mills,linestyle='None',  marker='o', color='green', label='maxBolus, emulated')
-                    axin.plot(origMaxBolus,loop_mills,linestyle='solid',             color='green', label='maxBolus, orig')
-                if featured('SMB') :
-                    axin.plot(emulSMB,    loop_mills, linestyle='None',  marker='o', color='black', label='SMB, emulated')
-                    axin.plot(origSMB,    loop_mills, linestyle='solid', marker='.', color='yellow',label='SMB, original')
-                if featured('basal') :
-                    axin.barh(y=loop_mills, height=thickness*2.0, width=emulBasal,   color='white', label='tempBasal, emulated', edgecolor='blue')
-                    axin.barh(y=loop_mills, height=thickness*0.8 , width=origBasal,  color='blue',  label='tempBasal, original')
+                    if featured('insReq') :
+                        axin.plot(emulInsReq, loop_mills, linestyle='None',  marker='o', color='red',   label='insulin Req, emulated')
+                        axin.plot(origInsReq, loop_mills, linestyle='solid', marker='.', color='orange',label='insulin Req, original')
+                    if featured('maxBolus') :
+                        axin.plot(emulMaxBolus,loop_mills,linestyle='None',  marker='o', color='green', label='maxBolus, emulated')
+                        axin.plot(origMaxBolus,loop_mills,linestyle='solid',             color='green', label='maxBolus, orig')
+                    if featured('SMB') :
+                        axin.plot(emulSMB,    loop_mills, linestyle='None',  marker='o', color='black', label='SMB, emulated')
+                        axin.plot(origSMB,    loop_mills, linestyle='solid', marker='.', color='yellow',label='SMB, original')
+                    if featured('basal') :
+                        axin.barh(y=loop_mills, height=thickness*2.0, width=emulBasal,   color='white', label='tempBasal, emulated', edgecolor='blue')
+                        axin.barh(y=loop_mills, height=thickness*0.8 , width=origBasal,  color='blue',  label='tempBasal, original')
 
-                #axin.plot([0,0], [loop_mills[0],loop_mills[-1]], linestyle='dotted', color='black')  # grid line for insulin=0                
-                axin.legend(loc='lower right')
-                
-            if frameBG :                                                                # anything related to glucose
-                axbg = fig.add_subplot(gs[0, bgOffset:bgOffset+2])                      # 2 strips wide
-                axbg.xaxis.label.set_color('red')
-                axbg.tick_params(axis='x', colors='red')
-                axbg.set_xlabel('...IOB...COB...Activity...Autosense...ISF...Targets...Glucose...', weight='bold')
-                if frameIns:                                                            # already annotated in insulin frame
-                    #axbg.set_yticklabels(['',''])                                      # dummy axis labels; lately problems
-                    axbg.set_yticks([-1,9e99])                                          # off scale to suppress ticks
-                else:                                                                   # not yet annotated in insulin frame
-                    axbg.set_yticks(yTicks)
-                    axbg.set_yticklabels(yLabels)
-                axbg.set_ylim(loop_mills[-1]+thickness*2, loop_mills[0]-thickness*2)
-                #axbg.set_xlim(0, 250)                                                  # no effect on squeezing for bg>250 !!
-
-                if featured('target') :                                                 # plot targets
-                    axbg.plot(emulTarHig, loop_mills, linestyle='None',   marker='o', color='black',  label='target high, emulated')
-                    axbg.plot(emulTarLow, loop_mills, linestyle='None',   marker='o', color='black',  label='target  low, emulated')
-                    axbg.plot(origTarHig, loop_mills, linestyle='dashed', marker='.', color='yellow', label='target high, original')
-                    axbg.plot(origTarLow, loop_mills, linestyle='dashed', marker='.', color='yellow', label='target  low, original')
-
-                if featured('bg') :                                                     # plot bg
-                    axbg.plot(bg,         bgTime,     linestyle='solid',  marker='o', color='red',    label='blood glucose')
-                    bgFrame = getBgTimeIndex(iFrame)
-                    dura05, avg05 = getHistBG(iFrame, 0.05)                             # mins in 5% band
-                    if dura05>1 and featured('range'):
-                        bg_min = avg05 * (1-0.05)
-                        bg_max = avg05 * (1+0.05)
-                        minmills = loop_mills[iFrame] - dura05 * 60
-                        axbg.fill_between([bg_min,bg_max], minmills-2*thickness, loop_mills[iFrame]+2*thickness, fc='red', alpha=0.25)
-                    if iFrame>1 and ( featured('fitsslope') or featured('bestslope')):  # show all fits
-                        dura70, slope70, slopes, iMax = getSlopeBG(bgFrame)
-                        first_linear_fit = True
-                        for i in slopes:
-                            #print ('iFrame', str(iFrame), ' mit', str(i), 'hat', str(slopes[i]))
-                            a = slopes[i]['a']
-                            b = slopes[i]['b']
-                            t1= bgTime[i]
-                            t2= bgTime[bgFrame]
-                            b1= b*t1+a
-                            b2= b*t2+a
-                            fitcolor = ['#c0c0c0',  'black']                            # grey, black
-                            isBest = ( i==iMax)
-                            if not isBest and featured('fitsslope'):
-                                if first_linear_fit:
-                                    axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='any linear fit')#all the fits
-                                    first_linear_fit = False
-                                else:
-                                    axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest])                     #all the fits
-                            if isBest and featured('bestslope'):
-                                axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='best linear fit')   #best fit
-                    if iFrame>2 and (featured('bestParabola') or featured('fitsParabola')): # show parabolas
-                        dura_p, delta_p, parabs, iMax = getBestParabolaBG(bgFrame)
-                        first_parabola_fit = True
-                        for i in parabs:
-                            #print('  plotting', str(parabs[i]))
-                            a2 = parabs[i]['a2']
-                            a1 = parabs[i]['a1']
-                            a0 = parabs[i]['a0']
-                            dur= parabs[i]['dur']
-                            bfit = []
-                            tfit = []
-                            fitcolor = ['#ff00ff',  '#900090']                          # faint violett = magenta, dark violett
-                            isBest = ( i==iMax)
-                            tx = bgTime[bgFrame] +5*60                                   # window end time = +5min from last glucose
-                            #if a2 != 0:
-                            #    tminmax = -a1/(2*a2)+5*60                               # time of min or max +5min
-                            #    tx = max(tx, tminmax)                                   # if min/max is ahead of bgTime
-                            while tx >= bgTime[bgFrame]-dur*60:
-                                ti = (tx - bgTime[bgFrame])/300
-                                bfit.append(a2*pow(ti,2) + a1*ti + a0)
-                                tfit.append(tx)
-                                #print(str(iFrame),'interim', str(i), str(tfit), str((bfit)))
-                                tx += -2.5*60                                           # go  backwards in fit window
-                            if not isBest and featured('fitsParabola'):
-                                axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])   # some Parabola
-                                if first_parabola_fit:
-                                    axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='any parabola fit')     # some other Parabola
-                                    first_parabola_fit = False
-                                else:
-                                    axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest])     # some other Parabola
-                                axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest])     # some other Parabola
-                            if isBest and featured('bestParabola'):
-                                axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])    #  best Parabola
-                                axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='best parabola fit') #  bulls eye of newest forecast
-                                axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest]) #  bulls eye of oldest forecast
-                        
-                if featured('as ratio') :                                               # plot autosense ratio
-                    axbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='Autosense(x10) OFF')
-                    axbg.plot(origAs_ratio,loop_mills,linestyle='solid',  marker='.',   color='black',label='Autosense(x10), original')
-                    axbg.plot(emulAs_ratio,loop_mills,linestyle='none',   marker='o',   color='black',label='Autosense(x10), emulated')
-
-                if featured('autoISF') :                                                # plot autoISF ratio on top of darker autosense
-                    #xbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='AutoISF(x10) OFF')
-                    axbg.plot(emulAI_ratio,loop_mills,linestyle='none',   marker='o',   color='#606060', label='AutoISF(x10), emulated')
-                    axbg.plot(origAI_ratio,loop_mills,linestyle='solid',  marker='.',   color='#C0C0C0', label='AutoISF(x10), original')
-
-                if featured('ISF') :                                                    # plot ISF
-                    axbg.plot(emulISF,loop_mills,linestyle='none',   marker='o',    color='#007000',label='ISF, emulated')
-                    axbg.plot(autoISF,loop_mills,linestyle='dashed', marker='.',    color='#009000',label='ISF, autosensed')
-                    axbg.plot(origISF,loop_mills,linestyle='dotted', marker='.',    color='#00FF00',label='ISF, original')
-
-                if featured('activity') :                                               # plot activity
-                    axbg.plot(activity, loop_mills, linestyle='solid',              color='yellow', label='Activity(x1000)')
-
-                if featured('iob') :                                                    # plot IOB
-                    axbg.plot(origiob,  loop_mills, linestyle='solid',              color='blue',   label='IOB(x10)')
-                    axbg.fill(iob_area, looparea, c='blue',   alpha=0.2)
-        
-                if featured('cob') :                                                    # plot COB
-                    axbg.plot(origcob,  loop_mills, linestyle='solid',              color='orange', label='COB')
-                    axbg.fill(cob_area, looparea, c='orange', alpha=0.4)
-
-                if featured('pred') :                                                   # plot the predictions
-                    thisTime = loop_mills[iFrame]
-                    loopCount = 48+1
-                    fcastmills = []
-                    for lp in range(loopCount):
-                        fcastmills.append(round(thisTime/1.000 + lp*5*60, 1 ))          # from millis to secs
-                    bbox_props = dict(boxstyle='larrow', fc='grey', alpha=0.7)          # slider with time label
-                    axbg.set_ylim(loop_mills[0]+thickness*2+yRange*1.1, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame + 10% space for BG labels
-                    axbg.set_xlim(0,250)                                                # otherwise we need to find scale over all time steps
-                    bg_min, bg_max = axbg.get_xlim()
-                    axbg.text(bg_min+3, fcastmills[0], loop_label[iFrame], va='center', size=8, bbox=bbox_props)
-                    axbg.fill_between([bg_min,bg_max], fcastmills[0]-2*thickness, fcastmills[-1]+2*thickness, fc='grey', alpha=0.6)  # time window
-                    if frameIns:
-                        in_min, in_max = axin.get_xlim()
-                        axin.plot([in_min,in_max], [fcastmills[0],fcastmills[0]], linestyle='dotted', color='grey', lw=0.5)          # time line
-
-                    Fcasts = Pred[thisTime]
-                    Levels = Fcasts['Levels']
-
-                    #print (str(loop_label[iFrame]), str(Levels))
-                    if 'minPredBG'    in Levels:
-                        BGValPlot(axbg,-1, 'minPredBG',    Levels['minPredBG'],    fcastmills[-1], colFav['bg'])
-                    if 'minZTGuardBG' in Levels:
-                        BGValPlot(axbg, 1, 'minZTGuardBG', Levels['minZTGuardBG'], fcastmills[-1], colFav['ZT'])
-                    if 'minIOBPredBG' in Levels:
-                        BGValPlot(axbg, 2, 'minIOBPredBG', Levels['minIOBPredBG'], fcastmills[-1], colFav['IOB'])
-                    if 'minCOBPredBG' in Levels:
-                        BGValPlot(axbg, 3, 'minCOBPredBG', Levels['minCOBPredBG'], fcastmills[-1], colFav['COB'])
-                    if 'minUAMPredBG' in Levels:
-                        BGValPlot(axbg, 4, 'minUAMPredBG', Levels['minUAMPredBG'], fcastmills[-1], colFav['UAM'])
-                    if 'avgPredBG'    in Levels:
-                        BGValPlot(axbg, 0, 'avgPredBG',    Levels['avgPredBG'],    fcastmills[-1], 'black')
-                    if 'naive_eventualBG'    in Levels:
-                        BGValPlot(axbg,-2, 'naive_eventualBG', Levels['naive_eventualBG'], fcastmills[-1], 'purple')
-                    if 'eventualBG'    in Levels:
-                        BGValPlot(axbg,-3, 'eventualBG',   Levels['eventualBG'],   fcastmills[-1], 'green')
+                    #axin.plot([0,0], [loop_mills[0],loop_mills[-1]], linestyle='dotted', color='black')  # grid line for insulin=0                
+                    axin.legend(loc='lower right')
                     
-                    if 'SMBoff' in Levels:
-                        SMBmsg = 'SMB disabled:\n' + Levels['SMBoff']
-                        threshold = Levels['value']
-                        label = Levels['type']
-                        SMBsource = Levels['source']
-                        couleur = colFav[SMBsource]
-                        if 'minGuardBG1' not in Levels:    sub_issue(str(Levels))
-                        minGuardBG = Levels['minGuardBG1']                                  # get maxin/only contributioon
-                        SMBarrow = dict(arrowstyle='<|-|>', fc=couleur, ec=couleur)
-                        if label == 'maxDelta' :
-                            Tmin = thisTime - 3*5*60
-                            Tmax = thisTime + 3*5*60
-                            posText = (minGuardBG+2, thisTime)
-                            posArrow= (threshold, thisTime)
-                        else:                                                               # why SMB is disabled
-                            Tmin = fcastmills[0]
-                            Tmax = fcastmills[-1]
-                            when_mills = Levels['timePos']
-                            if minGuardBG < 0 :                                             # off screen location supresses all
-                                minGuardBG = 20
-                                SMBarrow = dict(arrowstyle='<|-', fc=couleur, ec=couleur)
-                                axbg.plot([0,20], [fcastmills[when_mills],fcastmills[when_mills]], linestyle='dotted', color=couleur)
-                            posText = (threshold+2, fcastmills[when_mills])
-                            posArrow= (minGuardBG,  fcastmills[when_mills])
-                        axbg.plot([threshold,threshold], [Tmin,Tmax], linestyle='dashed', color='grey', label=label)
-                        if not 'source2' in Levels:                                         # single source
-                            axbg.annotate(SMBmsg, xy=posArrow, xytext=posText, va='center',
-                                            arrowprops=SMBarrow )                           # no alignment option: va='center') )
-                        else:                                                               # blended minGuard case !
-                            SMBsource2  = Levels['source2']
-                            minGuardBG2 = Levels['minGuardBG2']
-                            hub_bg   = Levels['minGuardBG']                                 # bg position of hub for "balance"
-                            couleur2 = colFav[SMBsource2]
-                            when_mills2 = Levels['timePos2']
-                            if minGuardBG2 == minGuardBG:
-                                share2 = 0
-                            else:
-                                share2 = (minGuardBG2-hub_bg)/(minGuardBG2-minGuardBG)      # fraction of BG2
-                            hub_mills = fcastmills[when_mills2]+(fcastmills[when_mills]-fcastmills[when_mills2])*share2   # time of hub for "balance"
-                            posText = (threshold+2, hub_mills)
-                            posArrow= (hub_bg,  hub_mills)
-                            axbg.annotate(SMBmsg, xy=posArrow, xytext=posText, va='center',
-                                            arrowprops=SMBarrow )                           # no alignment option: va='center') )
-                            axbg.plot((hub_bg,minGuardBG2), (hub_mills,fcastmills[when_mills2]),
-                                linestyle='dotted',  marker='o', color=couleur2)            # plot the lever arm of lesser contribution
-                            axbg.plot((hub_bg,minGuardBG), (hub_mills,fcastmills[when_mills]), 
-                                linestyle='dotted',  marker='o', color=couleur)             # plot the lever arm of lesser contribution
-                    else:
-                        SMBsource = ''
-                        axbg.plot([0,0], [0,0], linestyle='dashed', color='grey', label='...')# inactive, i.e. off screen; placeholder for legend
-    
-                    if 'COB' in Fcasts:                                                 # assume same logic as in original
-                        origCOB = Fcasts['COB']                                         # the original array from logfile
-                        initCOB = Fcasts['COBinitBGs']                                  # the emulated array before cleanup
-                        predCOB = Fcasts['COBpredBGs']                                  # is empty if COB=0; after cleanup
-                        axbg.plot(origCOB, fcastmills[:len(origCOB)], linestyle='solid',            color=colFav['COB'], label='predCOB, original')
-                        axbg.plot(initCOB, fcastmills[:len(initCOB)], linestyle='None', marker='.', color=colFav['COB'], fillstyle='none')
-                        axbg.plot(predCOB, fcastmills[:len(predCOB)], linestyle='None', marker='.', color=colFav['COB'], label='predCOB, emulated')
-                    else:
-                        axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['COB'], label='no COB active') # inactive
-                    
-                    if 'UAM' in Fcasts :                                                # same logic as in original or minGuard source
-                        origUAM = Fcasts['UAM']                                         # the initial array before cleanup
-                        axbg.plot(origUAM, fcastmills[:len(origUAM)], linestyle='solid',            color=colFav['UAM'], label='predUAM, original')
-                    elif 'UAM'==SMBsource :
-                        initUAM = Fcasts['UAMinitBGs']                                  # the initial array before cleanup
-                        predUAM = Fcasts['UAMpredBGs']
-                        axbg.plot(initUAM, fcastmills[:len(initUAM)], linestyle='None', marker='.', color=colFav['UAM'], fillstyle='none')
-                        axbg.plot(predUAM, fcastmills[:len(predUAM)], linestyle='None', marker='.', color=colFav['UAM'], label='predUAM, emulated')
-                    else:
-                        axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['UAM'], label='no UAM active') # inactive
-        
-                    if 'IOB' in Fcasts:                                                 # assume same logic as in original
-                        origIOB = Fcasts['IOB']                                         # the original array from logfile
-                        initIOB = Fcasts['IOBinitBGs']                                  # the emulated array before cleanup
-                        predIOB = Fcasts['IOBpredBGs']                                  # the emulated array after cleanup
-                        axbg.plot(origIOB, fcastmills[:len(origIOB)], linestyle='solid',            color=colFav['IOB'], label='predIOB, original')
-                        axbg.plot(initIOB, fcastmills[:len(initIOB)], linestyle='None', marker='.', color=colFav['IOB'], fillstyle='none')
-                        axbg.plot(predIOB, fcastmills[:len(predIOB)], linestyle='None', marker='.', color=colFav['IOB'], label='predIOB, emulated')
-                    else:
-                        axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['IOB'], label='no IOB active') # inactive
-    
-                    if 'ZT' in Fcasts:                                                  # assume same logic as in original
-                        origZT = Fcasts['ZT']                                               # from the orig loop
-                        initZT = Fcasts['ZTinitBGs']                                        # the initial array before cleanup
-                        predZT = Fcasts['ZTpredBGs']
-                        axbg.plot(origZT,  fcastmills[:len(origZT)],  linestyle='solid',            color=colFav['ZT'],  label='predZT, original')
-                        axbg.plot(initZT,  fcastmills[:len(initZT)],  linestyle='None', marker='.', color=colFav['ZT'],  fillstyle='none')
-                        axbg.plot(predZT,  fcastmills[:len(predZT)],  linestyle='None', marker='.', color=colFav['ZT'],  label='predZT, emulated')
-                    else:
-                        axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['ZT'],  label='no ZT  active') # inactive
-                    
-                axbg.legend(loc='lower right')
+                if frameBG :                                                                # anything related to glucose
+                    axbg = fig.add_subplot(gs[0, bgOffset:bgOffset+2])                      # 2 strips wide
+                    axbg.xaxis.label.set_color('red')
+                    axbg.tick_params(axis='x', colors='red')
+                    axbg.set_xlabel('...IOB...COB...Activity...Autosense...ISF...Targets...Glucose...', weight='bold')
+                    if frameIns:                                                            # already annotated in insulin frame
+                        #axbg.set_yticklabels(['',''])                                      # dummy axis labels; lately problems
+                        axbg.set_yticks([-1,9e99])                                          # off scale to suppress ticks
+                    else:                                                                   # not yet annotated in insulin frame
+                        axbg.set_yticks(yTicks)
+                        axbg.set_yticklabels(yLabels)
+                    axbg.set_ylim(loop_mills[-1]+thickness*2, loop_mills[0]-thickness*2)
+                    #axbg.set_xlim(0, 250)                                                  # no effect on squeezing for bg>250 !!
+
+                    if featured('target') :                                                 # plot targets
+                        axbg.plot(emulTarHig, loop_mills, linestyle='None',   marker='o', color='black',  label='target high, emulated')
+                        axbg.plot(emulTarLow, loop_mills, linestyle='None',   marker='o', color='black',  label='target  low, emulated')
+                        axbg.plot(origTarHig, loop_mills, linestyle='dashed', marker='.', color='yellow', label='target high, original')
+                        axbg.plot(origTarLow, loop_mills, linestyle='dashed', marker='.', color='yellow', label='target  low, original')
+
+                    if featured('bg') :                                                     # plot bg
+                        axbg.plot(bg,         bgTime,     linestyle='solid',  marker='o', color='red',    label='blood glucose')
+                        bgFrame = getBgTimeIndex(iFrame)
+                        dura05, avg05 = getHistBG(bgFrame, 0.05)                             # mins in 5% band
+                        if dura05>1 and featured('range'):
+                            bg_min = avg05 * (1-0.05)
+                            bg_max = avg05 * (1+0.05)
+                            bg_mills = bgTime[bgFrame]
+                            minmills = bg_mills - dura05 * 60
+                            axbg.fill_between([bg_min,bg_max], minmills-2*thickness, bg_mills+2*thickness, fc='red', alpha=0.25)
+                        if iFrame>1 and ( featured('fitsslope') or featured('bestslope')):  # show all fits
+                            dura70, slope70, slopes, iMax = getSlopeBG(bgFrame)
+                            first_linear_fit = True
+                            for i in slopes:
+                                #print ('iFrame', str(iFrame), ' mit', str(i), 'hat', str(slopes[i]))
+                                a = slopes[i]['a']
+                                b = slopes[i]['b']
+                                t1= bgTime[i]
+                                t2= bgTime[bgFrame]
+                                b1= b*t1+a
+                                b2= b*t2+a
+                                fitcolor = ['#c0c0c0',  'black']                            # grey, black
+                                isBest = ( i==iMax)
+                                if not isBest and featured('fitsslope'):
+                                    if first_linear_fit:
+                                        axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='any linear fit')#all the fits
+                                        first_linear_fit = False
+                                    else:
+                                        axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest])                     #all the fits
+                                if isBest and featured('bestslope'):
+                                    axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='best linear fit')   #best fit
+                        if iFrame>2 and (featured('bestParabola') or featured('fitsParabola')): # show parabolas
+                            dura_p, delta_p, parabs, iMax = getBestParabolaBG(bgFrame)
+                            first_parabola_fit = True
+                            for i in parabs:
+                                #print('  plotting', str(parabs[i]))
+                                a2 = parabs[i]['a2']
+                                a1 = parabs[i]['a1']
+                                a0 = parabs[i]['a0']
+                                dur= parabs[i]['dur']
+                                bfit = []
+                                tfit = []
+                                fitcolor = ['#ff00ff',  '#900090']                          # faint violett = magenta, dark violett
+                                isBest = ( i==iMax)
+                                tx = bgTime[bgFrame] +5*60                                   # window end time = +5min from last glucose
+                                #if a2 != 0:
+                                #    tminmax = -a1/(2*a2)+5*60                               # time of min or max +5min
+                                #    tx = max(tx, tminmax)                                   # if min/max is ahead of bgTime
+                                while tx >= bgTime[bgFrame]-dur*60:
+                                    ti = (tx - bgTime[bgFrame])/300
+                                    bfit.append(a2*pow(ti,2) + a1*ti + a0)
+                                    tfit.append(tx)
+                                    #print(str(iFrame),'interim', str(i), str(tfit), str((bfit)))
+                                    tx += -2.5*60                                           # go  backwards in fit window
+                                if not isBest and featured('fitsParabola'):
+                                    axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])   # some Parabola
+                                    if first_parabola_fit:
+                                        axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='any parabola fit')     # some other Parabola
+                                        first_parabola_fit = False
+                                    else:
+                                        axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest])     # some other Parabola
+                                    axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest])     # some other Parabola
+                                if isBest and featured('bestParabola'):
+                                    axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])    #  best Parabola
+                                    axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='best parabola fit') #  bulls eye of newest forecast
+                                    axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest]) #  bulls eye of oldest forecast
+                            
+                    if featured('as ratio') :                                               # plot autosense ratio
+                        axbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='Autosense(x10) OFF')
+                        axbg.plot(origAs_ratio,loop_mills,linestyle='solid',  marker='.',   color='black',label='Autosense(x10), original')
+                        axbg.plot(emulAs_ratio,loop_mills,linestyle='none',   marker='o',   color='black',label='Autosense(x10), emulated')
+
+                    if featured('autoISF') :                                                # plot autoISF ratio on top of darker autosense
+                        #xbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='AutoISF(x10) OFF')
+                        axbg.plot(emulAI_ratio,loop_mills,linestyle='none',   marker='o',   color='#606060', label='AutoISF(x10), emulated')
+                        axbg.plot(origAI_ratio,loop_mills,linestyle='solid',  marker='.',   color='#C0C0C0', label='AutoISF(x10), original')
+
+                    if featured('ISF') :                                                    # plot ISF
+                        axbg.plot(emulISF,loop_mills,linestyle='none',   marker='o',    color='#007000',label='ISF, emulated')
+                        axbg.plot(autoISF,loop_mills,linestyle='dashed', marker='.',    color='#009000',label='ISF, autosensed')
+                        axbg.plot(origISF,loop_mills,linestyle='dotted', marker='.',    color='#00FF00',label='ISF, original')
+
+                    if featured('activity') :                                               # plot activity
+                        axbg.plot(activity, loop_mills, linestyle='solid',              color='yellow', label='Activity(x1000)')
+
+                    if featured('iob') :                                                    # plot IOB
+                        axbg.plot(origiob,  loop_mills, linestyle='solid',              color='blue',   label='IOB(x10)')
+                        axbg.fill(iob_area, looparea, c='blue',   alpha=0.2)
             
-            if frameFlow :                                                              # anything related to flow chart
-                axfl = fig.add_subplot(gs[0, flowOffset:])
-                axfl.set_xticks([-99,99999])                                            # off scale to suppress ticks
-                axfl.set_xlim(10, 200)
-                axfl.set_xticklabels(['',''])                                           # dummy axis labels
-                axfl.set_yticks([-99999,99])                                            # off scale to suppress ticks
-                axfl.set_ylim(-700, 0)
-                axfl.set_yticklabels(['',''])                                           # dummy axis labels
-                axfl.set_xlabel('Flowchart and decision logic at time ' + loop_label[iFrame], weight='bold')
-                 
-                thisTime = loop_mills[iFrame]
-                Flows = FlowChart[thisTime]
-                row =  +20                                                              # start row, i.e. where the arrow starts
-                row_dist = 50
-                col = 20                                                                # start col, i.e. initial horizontal center
-                col_dist = 25
-                old_Thigh = 5                                                           # short start arrow
-                stripOffset = 0                                                         # later offset into second strip
-                for ele in Flows:                
-                    row_old = row
-                    col_old = col
-                    title = ele['title']
-                    indent = ele['indent']
-                    dchar, drow = getBoxSize(title)
-                    if eval(indent) == 0 :
-                        row -= row_dist
-                        col_offset = 0
-                        arr_offset = 1 + old_Thigh*4
-                        if indent == '0' :      col = 20 + stripOffset
-                    else:
-                        col += eval(indent)*col_dist
-                        col_offset = 1 + old_Tlen*0.3
-                        arr_offset = 0
+                    if featured('cob') :                                                    # plot COB
+                        axbg.plot(origcob,  loop_mills, linestyle='solid',              color='orange', label='COB')
+                        axbg.fill(cob_area, looparea, c='orange', alpha=0.4)
 
-                    if row<-680:                                                        # later : 650? check for bottom of first strip
-                        row = 20 - row_dist
-                        stripOffset += 100 - 5                                          # half of frame width
-                        col += stripOffset
+                    if featured('pred') :                                                   # plot the predictions
+                        thisTime = loop_mills[iFrame]
+                        loopCount = 48+1
+                        fcastmills = []
+                        for lp in range(loopCount):
+                            fcastmills.append(round(thisTime/1.000 + lp*5*60, 1 ))          # from millis to secs
+                        bbox_props = dict(boxstyle='larrow', fc='grey', alpha=0.7)          # slider with time label
+                        axbg.set_ylim(loop_mills[0]+thickness*2+yRange*1.1, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame + 10% space for BG labels
+                        axbg.set_xlim(0,250)                                                # otherwise we need to find scale over all time steps
+                        bg_min, bg_max = axbg.get_xlim()
+                        axbg.text(bg_min+3, fcastmills[0], loop_label[iFrame], va='center', size=8, bbox=bbox_props)
+                        axbg.fill_between([bg_min,bg_max], fcastmills[0]-2*thickness, fcastmills[-1]+2*thickness, fc='grey', alpha=0.6)  # time window
+                        if frameIns:
+                            in_min, in_max = axin.get_xlim()
+                            axin.plot([in_min,in_max], [fcastmills[0],fcastmills[0]], linestyle='dotted', color='grey', lw=0.5)          # time line
 
-                    if col<col_old:                                                     # when going back in columns
-                        flowBackwrd = dict(arrowstyle='<|-', 
-                            connectionstyle='bar, angle=180, fraction='+str((old_Thigh-16)/(col_old-col))) # lower number makes final downstroke longer
-                        axfl.annotate(ele['title'], xy=(col_old+col_offset, row_old-arr_offset), xytext=(col, row),
-                                 ha='center',  va='center', bbox=bbox, arrowprops=flowBackwrd, fontsize=6)
-                        AdrPlot(axfl, ele, row, drow, col, dchar)
+                        Fcasts = Pred[thisTime]
+                        Levels = Fcasts['Levels']
 
-                    elif stripOffset>0 and row>row_old:                                 # switch to 2nd strip
-                        flowBackwrd = dict(arrowstyle='<|-', linestyle='dotted',
-                            connectionstyle='bar, angle=90, fraction='+str(-5/(col_old-col)))
-                        axfl.annotate(ele['title'], xy=(col_old+old_Tlen*0.3, row_old-arr_offset*0), xytext=(col, row),
-                                 ha='center',  va='center', bbox=bbox, arrowprops=flowBackwrd, fontsize=6)
-                        AdrPlot(axfl, ele, row, drow, col, dchar)
+                        #print (str(loop_label[iFrame]), str(Levels))
+                        if 'minPredBG'    in Levels:
+                            BGValPlot(axbg,-1, 'minPredBG',    Levels['minPredBG'],    fcastmills[-1], colFav['bg'])
+                        if 'minZTGuardBG' in Levels:
+                            BGValPlot(axbg, 1, 'minZTGuardBG', Levels['minZTGuardBG'], fcastmills[-1], colFav['ZT'])
+                        if 'minIOBPredBG' in Levels:
+                            BGValPlot(axbg, 2, 'minIOBPredBG', Levels['minIOBPredBG'], fcastmills[-1], colFav['IOB'])
+                        if 'minCOBPredBG' in Levels:
+                            BGValPlot(axbg, 3, 'minCOBPredBG', Levels['minCOBPredBG'], fcastmills[-1], colFav['COB'])
+                        if 'minUAMPredBG' in Levels:
+                            BGValPlot(axbg, 4, 'minUAMPredBG', Levels['minUAMPredBG'], fcastmills[-1], colFav['UAM'])
+                        if 'avgPredBG'    in Levels:
+                            BGValPlot(axbg, 0, 'avgPredBG',    Levels['avgPredBG'],    fcastmills[-1], 'black')
+                        if 'naive_eventualBG'    in Levels:
+                            BGValPlot(axbg,-2, 'naive_eventualBG', Levels['naive_eventualBG'], fcastmills[-1], 'purple')
+                        if 'eventualBG'    in Levels:
+                            BGValPlot(axbg,-3, 'eventualBG',   Levels['eventualBG'],   fcastmills[-1], 'green')
+                        
+                        if 'SMBoff' in Levels:
+                            SMBmsg = 'SMB disabled:\n' + Levels['SMBoff']
+                            threshold = Levels['value']
+                            label = Levels['type']
+                            SMBsource = Levels['source']
+                            couleur = colFav[SMBsource]
+                            if 'minGuardBG1' not in Levels:    sub_issue(str(Levels))
+                            minGuardBG = Levels['minGuardBG1']                                  # get maxin/only contributioon
+                            SMBarrow = dict(arrowstyle='<|-|>', fc=couleur, ec=couleur)
+                            if label == 'maxDelta' :
+                                Tmin = thisTime - 3*5*60
+                                Tmax = thisTime + 3*5*60
+                                posText = (minGuardBG+2, thisTime)
+                                posArrow= (threshold, thisTime)
+                            else:                                                               # why SMB is disabled
+                                Tmin = fcastmills[0]
+                                Tmax = fcastmills[-1]
+                                when_mills = Levels['timePos']
+                                if minGuardBG < 0 :                                             # off screen location supresses all
+                                    minGuardBG = 20
+                                    SMBarrow = dict(arrowstyle='<|-', fc=couleur, ec=couleur)
+                                    axbg.plot([0,20], [fcastmills[when_mills],fcastmills[when_mills]], linestyle='dotted', color=couleur)
+                                posText = (threshold+2, fcastmills[when_mills])
+                                posArrow= (minGuardBG,  fcastmills[when_mills])
+                            axbg.plot([threshold,threshold], [Tmin,Tmax], linestyle='dashed', color='grey', label=label)
+                            if not 'source2' in Levels:                                         # single source
+                                axbg.annotate(SMBmsg, xy=posArrow, xytext=posText, va='center',
+                                                arrowprops=SMBarrow )                           # no alignment option: va='center') )
+                            else:                                                               # blended minGuard case !
+                                SMBsource2  = Levels['source2']
+                                minGuardBG2 = Levels['minGuardBG2']
+                                hub_bg   = Levels['minGuardBG']                                 # bg position of hub for "balance"
+                                couleur2 = colFav[SMBsource2]
+                                when_mills2 = Levels['timePos2']
+                                if minGuardBG2 == minGuardBG:
+                                    share2 = 0
+                                else:
+                                    share2 = (minGuardBG2-hub_bg)/(minGuardBG2-minGuardBG)      # fraction of BG2
+                                hub_mills = fcastmills[when_mills2]+(fcastmills[when_mills]-fcastmills[when_mills2])*share2   # time of hub for "balance"
+                                posText = (threshold+2, hub_mills)
+                                posArrow= (hub_bg,  hub_mills)
+                                axbg.annotate(SMBmsg, xy=posArrow, xytext=posText, va='center',
+                                                arrowprops=SMBarrow )                           # no alignment option: va='center') )
+                                axbg.plot((hub_bg,minGuardBG2), (hub_mills,fcastmills[when_mills2]),
+                                    linestyle='dotted',  marker='o', color=couleur2)            # plot the lever arm of lesser contribution
+                                axbg.plot((hub_bg,minGuardBG), (hub_mills,fcastmills[when_mills]), 
+                                    linestyle='dotted',  marker='o', color=couleur)             # plot the lever arm of lesser contribution
+                        else:
+                            SMBsource = ''
+                            axbg.plot([0,0], [0,0], linestyle='dashed', color='grey', label='...')# inactive, i.e. off screen; placeholder for legend
+        
+                        if 'COB' in Fcasts:                                                 # assume same logic as in original
+                            origCOB = Fcasts['COB']                                         # the original array from logfile
+                            initCOB = Fcasts['COBinitBGs']                                  # the emulated array before cleanup
+                            predCOB = Fcasts['COBpredBGs']                                  # is empty if COB=0; after cleanup
+                            axbg.plot(origCOB, fcastmills[:len(origCOB)], linestyle='solid',            color=colFav['COB'], label='predCOB, original')
+                            axbg.plot(initCOB, fcastmills[:len(initCOB)], linestyle='None', marker='.', color=colFav['COB'], fillstyle='none')
+                            axbg.plot(predCOB, fcastmills[:len(predCOB)], linestyle='None', marker='.', color=colFav['COB'], label='predCOB, emulated')
+                        else:
+                            axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['COB'], label='no COB active') # inactive
+                        
+                        if 'UAM' in Fcasts :                                                # same logic as in original or minGuard source
+                            origUAM = Fcasts['UAM']                                         # the initial array before cleanup
+                            axbg.plot(origUAM, fcastmills[:len(origUAM)], linestyle='solid',            color=colFav['UAM'], label='predUAM, original')
+                        elif 'UAM'==SMBsource :
+                            initUAM = Fcasts['UAMinitBGs']                                  # the initial array before cleanup
+                            predUAM = Fcasts['UAMpredBGs']
+                            axbg.plot(initUAM, fcastmills[:len(initUAM)], linestyle='None', marker='.', color=colFav['UAM'], fillstyle='none')
+                            axbg.plot(predUAM, fcastmills[:len(predUAM)], linestyle='None', marker='.', color=colFav['UAM'], label='predUAM, emulated')
+                        else:
+                            axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['UAM'], label='no UAM active') # inactive
+            
+                        if 'IOB' in Fcasts:                                                 # assume same logic as in original
+                            origIOB = Fcasts['IOB']                                         # the original array from logfile
+                            initIOB = Fcasts['IOBinitBGs']                                  # the emulated array before cleanup
+                            predIOB = Fcasts['IOBpredBGs']                                  # the emulated array after cleanup
+                            axbg.plot(origIOB, fcastmills[:len(origIOB)], linestyle='solid',            color=colFav['IOB'], label='predIOB, original')
+                            axbg.plot(initIOB, fcastmills[:len(initIOB)], linestyle='None', marker='.', color=colFav['IOB'], fillstyle='none')
+                            axbg.plot(predIOB, fcastmills[:len(predIOB)], linestyle='None', marker='.', color=colFav['IOB'], label='predIOB, emulated')
+                        else:
+                            axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['IOB'], label='no IOB active') # inactive
+        
+                        if 'ZT' in Fcasts:                                                  # assume same logic as in original
+                            origZT = Fcasts['ZT']                                               # from the orig loop
+                            initZT = Fcasts['ZTinitBGs']                                        # the initial array before cleanup
+                            predZT = Fcasts['ZTpredBGs']
+                            axbg.plot(origZT,  fcastmills[:len(origZT)],  linestyle='solid',            color=colFav['ZT'],  label='predZT, original')
+                            axbg.plot(initZT,  fcastmills[:len(initZT)],  linestyle='None', marker='.', color=colFav['ZT'],  fillstyle='none')
+                            axbg.plot(predZT,  fcastmills[:len(predZT)],  linestyle='None', marker='.', color=colFav['ZT'],  label='predZT, emulated')
+                        else:
+                            axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['ZT'],  label='no ZT  active') # inactive
+                        
+                    axbg.legend(loc='lower right')
+                
+                if frameFlow :                                                              # anything related to flow chart
+                    axfl = fig.add_subplot(gs[0, flowOffset:])
+                    axfl.set_xticks([-99,99999])                                            # off scale to suppress ticks
+                    axfl.set_xlim(10, 200)
+                    axfl.set_xticklabels(['',''])                                           # dummy axis labels
+                    axfl.set_yticks([-99999,99])                                            # off scale to suppress ticks
+                    axfl.set_ylim(-700, 0)
+                    axfl.set_yticklabels(['',''])                                           # dummy axis labels
+                    axfl.set_xlabel('Flowchart and decision logic at time ' + loop_label[iFrame], weight='bold')
+                     
+                    thisTime = loop_mills[iFrame]
+                    Flows = FlowChart[thisTime]
+                    row =  +20                                                              # start row, i.e. where the arrow starts
+                    row_dist = 50
+                    col = 20                                                                # start col, i.e. initial horizontal center
+                    col_dist = 25
+                    old_Thigh = 5                                                           # short start arrow
+                    stripOffset = 0                                                         # later offset into second strip
+                    for ele in Flows:                
+                        row_old = row
+                        col_old = col
+                        title = ele['title']
+                        indent = ele['indent']
+                        dchar, drow = getBoxSize(title)
+                        if eval(indent) == 0 :
+                            row -= row_dist
+                            col_offset = 0
+                            arr_offset = 1 + old_Thigh*4
+                            if indent == '0' :      col = 20 + stripOffset
+                        else:
+                            col += eval(indent)*col_dist
+                            col_offset = 1 + old_Tlen*0.3
+                            arr_offset = 0
 
-                    else:                                                               # normal situation
-                        axfl.annotate(ele['title'], xy=(col_old+col_offset, row_old-arr_offset), xytext=(col, row),
-                                 ha='center',  va='center', bbox=bbox, arrowprops=flowForward, fontsize=6)
-                        AdrPlot(axfl, ele, row, drow, col, dchar)
+                        if row<-680:                                                        # later : 650? check for bottom of first strip
+                            row = 20 - row_dist
+                            stripOffset += 100 - 5                                          # half of frame width
+                            col += stripOffset
 
-                    old_Tlen = dchar
-                    old_Thigh= drow
+                        if col<col_old:                                                     # when going back in columns
+                            flowBackwrd = dict(arrowstyle='<|-', 
+                                connectionstyle='bar, angle=180, fraction='+str((old_Thigh-16)/(col_old-col))) # lower number makes final downstroke longer
+                            axfl.annotate(ele['title'], xy=(col_old+col_offset, row_old-arr_offset), xytext=(col, row),
+                                     ha='center',  va='center', bbox=bbox, arrowprops=flowBackwrd, fontsize=6)
+                            AdrPlot(axfl, ele, row, drow, col, dchar)
 
-            pdf.savefig()
-            if not featured('pred') and featured('LIST'):                        # only 1 frame
+                        elif stripOffset>0 and row>row_old:                                 # switch to 2nd strip
+                            flowBackwrd = dict(arrowstyle='<|-', linestyle='dotted',
+                                connectionstyle='bar, angle=90, fraction='+str(-5/(col_old-col)))
+                            axfl.annotate(ele['title'], xy=(col_old+old_Tlen*0.3, row_old-arr_offset*0), xytext=(col, row),
+                                     ha='center',  va='center', bbox=bbox, arrowprops=flowBackwrd, fontsize=6)
+                            AdrPlot(axfl, ele, row, drow, col, dchar)
+
+                        else:                                                               # normal situation
+                            axfl.annotate(ele['title'], xy=(col_old+col_offset, row_old-arr_offset), xytext=(col, row),
+                                     ha='center',  va='center', bbox=bbox, arrowprops=flowForward, fontsize=6)
+                            AdrPlot(axfl, ele, row, drow, col, dchar)
+
+                        old_Tlen = dchar
+                        old_Thigh= drow
+
+                pdf.savefig()
+            if not featured('pred') and featured('LIST') and maxPlots>0:                        # only 1 frame
                 for i in range(iFrame+1,  len(entries)):
                     log_msg(entries[loop_mills[i]].replace('.', my_decimal))
-            if how_to_print!='GUI' and featured('PDF'):    plt.show()     # otherwise conflict with root.mainloop() in tkinter
+            if how_to_print!='GUI' and featured('PDF') and not featured('pred') and maxPlots>0:
+                #print('batch mode with PDF')
+                plt.show()     # otherwise conflict with root.mainloop() in tkinter
             plt.close()                                     # end of current page
         #pdf.close()                                        # not needed due to "with ..." method triggered above
     pass
@@ -1988,7 +2018,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  isZip                                   # flag for input file type
     global  newLoop                                 # flag whether data collection for new loop started
     #global  entries
-    global   deltas, linFit, cubFit
+    global   deltas, linFit, cubFit, new_parameter
 
     deltas      = {}
     linFit      = {}
@@ -2055,6 +2085,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         varLabel = varLabel[:-4]
     else:
         varFile = varFile + '.vdf'
+    if setVariant('1900-01-01T00:00:00'):
+        return  'Z', 0, '', '', 0, ''               # prescan to get parabola fit length
+
     #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)#   
     logListe = glob.glob(myseek+myfile, recursive=False)
     #print ('logListe:', str(logListe))
@@ -2096,6 +2129,34 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                     pass
         if len(sorted_fn) == 0:
             sorted_fn[myseek] = myseek              # in case of special naming use just that file
+ 
+
+    """
+ 
+    # --- check for external bg_emul source ----------
+    global use_bg_emul
+    use_bg_emul = False
+    print('echo of calling parameters:\n' + msg)
+    wo = msg.find('BG_emul data table    t_') + len('BG_emul data table    t_')
+    if wo>0:
+        use_bg_emul = True
+        tableau = msg[wo:(wo+msg[wo:].find('\n'))]
+        print('get bg emul from', tableau)
+       inpStart = max(tstart.get(), selectedFirst)
+        inpStopp = min(tstopp.get(), selectedLast)
+        useStart = getTriggerDate(inpStart)
+        useStopp = getTriggerDate(inpStopp)
+        if useStart==timedelta(0) or useStopp==timedelta(0):
+            print('wrong time window '+ tstart.get() + ' or ' + tstop.get() )
+            return
+        sql = "select "+tableau+" from t_"+tableau+" where "+tableau+">="+str(bg_threshold) \
+            + " and STAMP>='"+useStart+"' and STAMP<='"+useStopp+"'"
+        cur.execute(sql)
+        for rec in cur:
+            bg = rec[0]
+            n_bg = np.append(n_bg, [bg])
+    """
+
 
     filecount = 0
     wd = os.path.dirname(varFile)
@@ -2305,8 +2366,8 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             #print (str(fraction*60))
             origBasalint += origBasal[i]*fraction
             emulBasalint += emulBasal[i]*fraction
-            if min_bg>bg[i]:                    min_bg = bg[i]
-            if max_bg<bg[i]:                    max_bg = bg[i]
+            if min_bg>bg[getBgTimeIndex(i)]:    min_bg = bg[getBgTimeIndex(i)]
+            if max_bg<bg[getBgTimeIndex(i)]:    max_bg = bg[getBgTimeIndex(i)]
             if min_origAS>origAs_ratio[i]:      min_origAS = origAs_ratio[i]
             if max_origAS<origAs_ratio[i]:      max_origAS = origAs_ratio[i]
             if min_emulAS>emulAs_ratio[i]:      min_emulAS = emulAs_ratio[i]
@@ -2359,6 +2420,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         tabz = ';Totals:'+ ';'*36+f'{round(origSMBsum,1):>229}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
 
+        """
         # ---   list all types of delta information    -----------
         #pro = os.system("SET PYTHONUTF8=1")
         #print(str(pro))
@@ -2385,6 +2447,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             i += 1
             if i >= len(loop_label):        break
         delta.close()
+        """
 
     xyf.close()
     
