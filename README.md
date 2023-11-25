@@ -1,7 +1,7 @@
 This branch is still under development. The new software is fairly stable but the documentation is still in flux.
 Major updates:
-- include the autoISF2.2.8.1 capabilities
-- reorganise the user documentation
+- include the AAPS 3.2.0.2 capabilities
+- include the autoISF3.0 capabilities
 
 See also the change.log
 
