@@ -246,6 +246,8 @@ def loop_smb(microBolusAllowed, profile, iob_data, iobTH_reduction_ratio, Flows)
             iobTHeffective = 100
         if 'profile_percentage' not in profile:     profile['profile_percentage'] = 100
 
+        console_error('iobTH_reduction_ratio='+str(iobTH_reduction_ratio), 'iobTH='+str(iobTHeffective))
+        
         if not evenTarget:
             console_error("SMB disabled; " +msgType +str(target) +msgUnits +msgEven +msgTail)
             console_error("Loop at minimum power")

@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-11-24 17:59'
+    echo_msg['emulator_core.py'] = '2023-11-29 02:54'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -564,7 +564,7 @@ def setVariant(stmp):
                 logres = myVal
             elif myArray != 'new_parameter':
                 validRow = False
-                varlog.write(myArray, 'is an inrecognised array/json/keyword')
+                if myArray != '':   varlog.write(myArray + ' is an inrecognised array/json/keyword')
         
             if (stmp != '1900-01-01T00:00:00') :
                 if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
