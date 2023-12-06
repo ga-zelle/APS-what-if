@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-11-24 04:20'
+    echo_msg['determine_basal.py'] = '2023-12-06 02:21'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -217,7 +217,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, iobTH_reduction_ratio, Flows)
         return "AAPS";                                                  #// see message in enable_smb
     gz_proto = 'full_basal_exercise_target' in profile
     if ( (profile['temptargetSet'] and profile['enableSMB_EvenOn_OddOff']) \
-        or (profile['min_bg']==profile['max_bg'] and profile['enableSMB_EvenOn_OddOff_always']) ):
+        or (profile['min_bg']==profile['max_bg'] and profile['enableSMB_EvenOn_OddOff_always'] and not profile['temptargetSet']) ):     # fix 1 included  "and not profile['enableSMB_EvenOn_OddOff']"
         Flows.append(dict(title="SMB settings by full loop logic", indent='0', adr='loop_203'))
         target = convert_bg(profile['target_bg'], profile)
         if (profile['temptargetSet']) :
@@ -246,7 +246,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, iobTH_reduction_ratio, Flows)
             iobTHeffective = 100
         if 'profile_percentage' not in profile:     profile['profile_percentage'] = 100
 
-        console_error('iobTH_reduction_ratio='+str(iobTH_reduction_ratio), 'iobTH='+str(iobTHeffective))
+        #console_error('iobTH_reduction_ratio='+str(iobTH_reduction_ratio), 'iobTH='+str(iobTHeffective))
         
         if not evenTarget:
             console_error("SMB disabled; " +msgType +str(target) +msgUnits +msgEven +msgTail)
@@ -628,11 +628,11 @@ def activityMonitor(profile, bg, target_bg, thisTime):
     recentSteps60Minutes = profile['recentSteps60Minutes']
     phoneMoved = profile['phone_moved']
     time_since_start = profile['time_since_start']
-    activity_weight = profile['activity_weight']
-    inactivity_weight = profile['inactivity_weight']
-    nightly_inactivity_detection = profile['nightly_inactivity_detection']
-    activity_idle_start = profile['activity_idle_start']
-    activity_idle_end = profile['activity_idle_end']
+    activity_scale_factor = profile['activity_scale_factor']
+    inactivity_scale_factor = profile['inactivity_scale_factor']
+    ignore_inactivity_overnight = profile['ignore_inactivity_overnight']
+    inactivity_idle_start = profile['inactivity_idle_start']
+    inactivity_idle_end = profile['inactivity_idle_end']
     activityRatio = 1.0
 
     if ( not activityDetection ) :
@@ -644,35 +644,34 @@ def activityMonitor(profile, bg, target_bg, thisTime):
         console_error("Activity monitor disabled: Phone seems not to be carried for the last 15m")
     else :
         if ( time_since_start < 60 and recentSteps60Minutes <= 200 ) :
-            console_error("Activity monitor initialising for "+str(60-time_since_start)+" more minutes")
-        elif ( ( activity_idle_start>activity_idle_end and ( hour>=activity_idle_start or hour<activity_idle_end ) ) #//inludes midnight
-            or ( hour>=activity_idle_start and hour<activity_idle_end) #// excludes midnight
-            and recentSteps60Minutes <= 200 and nightly_inactivity_detection ) :
+            console_error("Activity monitor initialising for "+str(60-time_since_start)+" more minutes: inactivity detection disabled")
+        elif ( ( inactivity_idle_start>inactivity_idle_end and ( hour>=inactivity_idle_start or hour<inactivity_idle_end ) ) #//inludes midnight
+            or ( hour>=inactivity_idle_start and hour<inactivity_idle_end) #// excludes midnight
+            and recentSteps60Minutes <= 200 and ignore_inactivity_overnight ) :
             console_error("Activity monitor disabled: sleeping hours")
         elif ( recentSteps5Minutes > 300 or recentSteps10Minutes > 300 or recentSteps15Minutes > 300 or recentSteps30Minutes > 1500 or recentSteps60Minutes > 2500 ) :
             #stepActivityDetected = True
-            activityRatio = 1 - 0.3 * activity_weight
+            activityRatio = 1 - 0.3 * activity_scale_factor
             console_error("Activity monitor detected activity, sensitivity ratio: " +str(activityRatio))
         elif ( recentSteps5Minutes > 200 or recentSteps10Minutes > 200 or recentSteps15Minutes > 200
             or recentSteps30Minutes > 500 or recentSteps60Minutes > 800 ) :
             #stepActivityDetected = True
-            activityRatio = 1 - 0.15 * activity_weight
+            activityRatio = 1 - 0.15 * activity_scale_factor
             console_error("Activity monitor detected partial activity, sensitivity ratio: " +str(activityRatio))
         elif ( bg < target_bg and recentSteps60Minutes <= 200 ) :
-            console_error("Activity monitor disabled: bg < target")
+            console_error("Activity monitor disabled inactivity detection: bg < target")
         elif ( recentSteps60Minutes < 50 ) :
             #stepInactivityDetected = True
-            activityRatio = 1 + 0.2 * inactivity_weight
+            activityRatio = 1 + 0.2 * inactivity_scale_factor
             console_error("Activity monitor detected inactivity, sensitivity ratio: " + str(activityRatio))
         elif ( recentSteps60Minutes <= 200 ) :
             #stepInactivityDetected = True
-            activityRatio = 1 + 0.1 * inactivity_weight
+            activityRatio = 1 + 0.1 * inactivity_scale_factor
             console_error("Activity monitor detected partial inactivity, sensitivity ratio: " + str(activityRatio));
         else :
             console_error("Activity monitor detected neutral state, sensitivity ratio unchanged: " + str(short(activityRatio)))
         #//console_error("end Activity detection")
     return activityRatio
-
 
 def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, microBolusAllowed, reservoir_data, thisTime, Fcasts, Flows, emulAI_ratio):
     rT = {} #//short for requestedTemp
