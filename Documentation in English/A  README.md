@@ -30,6 +30,10 @@ By running the emulator on the AAPS phone you can already get live hints when ex
 This is an older document which guides you through the process of generating spreadsheet tables and graphs. These help in identifying which parameter to modify and provide a first estimate by how much.
 </details>
 
+<details><summary>Example Emulator study - Negative IOB Problem or else</summary>
+This leads through the process from analysing the problem, dreaming up potential adjustments, setting up VDF files, analysing resuls and discussing the various results.
+</details>
+
 <details><summary>Installation guide.pdf</summary>
 Starts from getting and installing the required files and 
   
