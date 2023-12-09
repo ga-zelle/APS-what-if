@@ -3,7 +3,7 @@ Major updates:
 - include the autoISF2.2.8.1 capabilities
 - reorganise the user documentation
 
-The software in this branch is not compatible upward with AAPS3.2.0.2
+The software in this branch is not upward compatible with AAPS3.2.0.2
 
 See also the change.log
 
