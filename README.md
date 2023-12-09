@@ -2,6 +2,7 @@ This branch is still under development. The new software is fairly stable but th
 Major updates:
 - include the AAPS 3.2.0.2 capabilities
 - include the autoISF3.0 capabilities
+This branch is not yet fully tested and may contain bugs. In such cases please contact ga-zelle.
 
 See also the change.log
 
