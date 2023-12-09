@@ -2,6 +2,9 @@ This branch was updated to cover
 - the migration to AAPS 3.1.0.2 
 - to include the autoISF2.2.7 capabilities
 
+For  the latest scripts please use the newest branch or in case or problems even try the dev branch 
+to be compatible with later AAPS and autoISF versions.
+
 # APS-what-if
 
 I translated the original java code of "determineSMB-basal" into python and can run it on a PC. 
