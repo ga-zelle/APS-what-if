@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-12-06 02:21'
+    echo_msg['determine_basal.py'] = '2023-12-07 18:37'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -22,7 +22,7 @@ def round_basal(value, dummy) :
     #function round(value, digits):
     #    if (! digits) { digits = 0; }
     #    var scale = Math.pow(10, digits);
-    return round(value, 4)                  # make it compatible with logfile format
+    return round(value, 3)      # make it compatible with logfile format; was 4, as of 3.2.0.2 using 3
 
 #// we expect BG to rise or fall at the rate of BGI,
 #// adjusted by the rate at which BG would need to rise /
@@ -607,6 +607,9 @@ def determine_varSMBratio(profile, bg, target_bg, loop_wanted_smb, Flows):
     if (bg >= higher_bg) :
         console_error('SMB delivery ratio limited by maximum value', higher_SMB)
         return higher_SMB
+    if (abs(profile['parabola_fit_source']) == 1) :
+        console_error('SMB delivery ratio for FSL kept at fixed value', fix_SMB)
+        return fix_SMB
     console_error('SMB delivery ratio set to interpolated value', new_SMB)
     return new_SMB
 

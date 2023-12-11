@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-11-29 02:54'
+    echo_msg['emulator_core.py'] = '2023-12-07 18:34'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -338,11 +338,22 @@ def setVariant(stmp):
             profile['enable_dura_ISF_with_COB'] = False     ### not known before without ai
         if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
             profile['activity_detection'] = False       ### not known before without ai
-        if 'nightly_inactivity_detection' not in profile:
-            profile['nightly_inactivity_detection'] = False
-        if 'activity_idle_start' not in profile:
-            profile['activity_idle_start'] = 0
-            profile['activity_idle_end'] = 0
+        if profile['activity_detection']:
+            if 'activity_weight' in profile:
+                profile['activity_scale_factor'] = profile['activity_weight' ]
+                profile['inactivity_scale_factor'] = profile['inactivity_weight' ]
+            if 'nightly_inactivity_detection' in profile:
+                profile['ignore_inactivity_overnight'] = profile['nightly_inactivity_detection']
+            if 'ignore_inactivity_overnight' not in profile:
+                profile['ignore_inactivity_overnight'] = False
+            if 'activity_idle_start' in profile:
+                profile['inactivity_idle_start'] = profile['activity_idle_start']
+                profile['inactivity_idle_end'] = profile['activity_idle_end']
+            if 'inactivity_idle_start' not in profile:
+                profile['inactivity_idle_start'] = 0
+                profile['inactivity_idle_end'] = 0
+        if 'parabola_fit_source' not in profile:            ### predating A3.2.0.2 Libre3
+            profile['parabola_fit_source'] = 5              ### standard CGMs at 5m interval
         if AAPS_Version == '<2.7':                          
             profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
             profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
