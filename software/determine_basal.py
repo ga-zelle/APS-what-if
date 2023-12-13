@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-12-07 18:37'
+    echo_msg['determine_basal.py'] = '2023-12-12 16:57'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -389,7 +389,7 @@ def withinISFlimits(liftISF, minISFReduction, maxISFReduction, sensitivityRatio,
     else :
         final_ISF = min(liftISF, sensitivityRatio)
         if (liftISF <= sensitivityRatio):       origin_sens = ""
-    console_error("final ISF factor is", str(short(round(final_ISF,2))) + origin_sens)
+    console_error("final ISF factor is", str(short(round(final_ISF,2))), origin_sens)
     console_error("----------------------------------")
     console_error("end autoISF")
     console_error("----------------------------------")
@@ -867,6 +867,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
 
     Flows.append(dict(title="Impact of\nautosens("+str(round(sensitivityRatio,3))+")\non  basal", indent='0', adr='140'))
     iobTH_reduction_ratio = profile['profile_percentage'] / 100 * exercise_ratio * activityRatio
+    Fcasts['emuliobTH'] = iobTH_reduction_ratio * profile['max_iob'] * profile['iob_threshold_percent'] / 10    # scale up for plotting
     if (sensitivityRatio):
         basal = profile['current_basal'] * sensitivityRatio
         basal = round_basal(basal, profile)

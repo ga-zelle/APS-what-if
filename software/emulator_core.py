@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-12-07 18:34'
+    echo_msg['emulator_core.py'] = '2023-12-13 01:15'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -336,9 +336,9 @@ def setVariant(stmp):
             profile['enable_pp_ISF_always'] = False         ### not known before ai2.2.7
         if 'enable_dura_ISF_with_COB' not in profile:
             profile['enable_dura_ISF_with_COB'] = False     ### not known before without ai
-        if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
-            profile['activity_detection'] = False       ### not known before without ai
-        if profile['activity_detection']:
+        #if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
+        #    profile['activity_detection'] = False       ### not known before without ai
+        if 'activity_detection' in profile and profile['activity_detection']:
             if 'activity_weight' in profile:
                 profile['activity_scale_factor'] = profile['activity_weight' ]
                 profile['inactivity_scale_factor'] = profile['inactivity_weight' ]
@@ -614,6 +614,7 @@ def TreatLoop(Curly, log, lcount, fn):
     global SMBreason, newLoop
     global loop_mills, loop_label, bgTimeMap, bgTime, bg
     global origInsReq
+    global emuliobTH, tolerance_iobTH
     global origSMB, emulSMB
     global origMaxBolus, emulMaxBolus
     global origBasal, lastBasal
@@ -788,6 +789,8 @@ def TreatLoop(Curly, log, lcount, fn):
         acceISF.append(Fcasts['acceISF'])               # was set in determine_basal.py
         dura_ISF.append(Fcasts['dura_ISF'])             # was set in determine_basal.py
         emulISF.append(Fcasts['emulISF'])               # was set in determine_basal.py
+        emuliobTH.append(Fcasts['emuliobTH'])           # was set in determine_basal.py
+        tolerance_iobTH.append(Fcasts['emuliobTH']*1.3) # 30% overrun tolerated
 
         if reason.find('COB: 0,') == 0: 
             Fcasts['COBpredBGs'] = []                   # clear array if COB=0
@@ -1541,6 +1544,7 @@ def XYplots(loopCount, head1, head2, entries) :
     
     if len(loop_mills) < len(origcob)       :   origcob.pop()
     if len(loop_mills) < len(origiob)       :   origiob.pop()
+    if len(loop_mills) < len(emuliobTH)     :   emuliobTH.pop()
     if len(loop_mills) < len(origAs_ratio)  :   origAs_ratio.pop()
     if len(loop_mills) < len(emulAs_ratio)  :   emulAs_ratio.pop()
     if len(loop_mills) < len(origAI_ratio)  :   origAI_ratio.pop()
@@ -1550,6 +1554,8 @@ def XYplots(loopCount, head1, head2, entries) :
     # ---   complete the curves to close the polygon for area fill
     cob_area = []
     iob_area = []
+    i_iobTH  = []
+    t_iobTH  = []
     looparea = []
     cob_area.append(0)                      # top left corner
     iob_area.append(0)                      # top left corner
@@ -1559,6 +1565,8 @@ def XYplots(loopCount, head1, head2, entries) :
         cob_area.append(origcob[i])             # the regular data
         iob_area.append(origiob[i])             # the regular data
         looparea.append(lopmil)
+        t_iobTH.append(lopmil)
+        i_iobTH.append(emuliobTH[i])
         i += 1
     cob_area.append(0)                      # bottom left corner
     iob_area.append(0)                      # bottom left corner
@@ -1790,7 +1798,16 @@ def XYplots(loopCount, head1, head2, entries) :
                     if featured('iob') :                                                    # plot IOB
                         axbg.plot(origiob,  loop_mills, linestyle='solid',              color='blue',   label='IOB(x10)')
                         axbg.fill(iob_area, looparea, c='blue',   alpha=0.2)
-            
+                        #axbg.plot(emuliobTH,loop_mills, linestyle='dashed',             color='blue',   label='eff. iobTH(x10), emulated')
+                        #axbg.plot(tolerance_iobTH,loop_mills, linestyle='dotted',       color='blue',   label='tol. iobTH(x10), emulated')
+                        #i_iobTH = emuliobTH
+                        #t_iobTH = loop_mills
+                        for i in range(len(emuliobTH)-1, 0, -1):
+                            i_iobTH.append(tolerance_iobTH[i])
+                            t_iobTH.append(loop_mills[i])
+                        i_iobTH.append(tolerance_iobTH[0])
+                        t_iobTH.append(t_iobTH[0])                        
+                        axbg.fill(i_iobTH, t_iobTH,              alpha=0.4,              color='cyan',   label='iobTH tolerance band(x10), emulated')           
                     if featured('cob') :                                                    # plot COB
                         axbg.plot(origcob,  loop_mills, linestyle='solid',              color='orange', label='COB')
                         axbg.fill(cob_area, looparea, c='orange', alpha=0.4)
@@ -2013,7 +2030,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  origTarLow, emulTarLow, origTarHig, emulTarHig
     global  origAs_ratio, emulAs_ratio              # Autosense
     global  origAI_ratio, emulAI_ratio              # autoISF
-    global  origiob, origcob
+    global  origiob, origcob, origiobTH, emuliobTH, tolerance_iobTH
     global  activity
     global  origInsReq, emulInsReq
     global  origSMB, emulSMB, origMaxBolus, emulMaxBolus
@@ -2050,6 +2067,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     origAI_ratio= []
     emulAI_ratio= []
     origiob     = []
+    origiobTH   = []
+    emuliobTH   = []
+    tolerance_iobTH = []
     origcob     = []
     activity    = []
     
@@ -2231,13 +2251,13 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 if featured('target'):
                     r_list += f'{round((origTarLow[iFrame] + origTarHig[iFrame])/2,0):>8}'.replace(".0","")
                 if featured('iob'):     
-                    r_list += f'{round(origiob[iFrame]/10,2):>6}'   # was scaled up for plotting
+                    r_list += f'{round(origiob[iFrame]/10,2):>6}{round(emuliobTH[iFrame]/10,2):>6}'   # scaled up for plotting
                 if featured('cob'):     
                     r_list += f'{round(origcob[iFrame],2):>6}'
                 #if featured('as ratio'):
                 #    r_list += f'{round(origAs_ratio[iFrame]/10,2):>6}'     # was scaled up for plotting
                 #if featured('autoISF'):
-                #    #_list += f'{round(origAI_ratio[iFrame]/10,2):>6} {round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
+                #    #_list += f'{round(origAI_ratio[iFrame]/10,2):>6} {round(emulAI_ratio[iFrame]/10,2):>4}'     # scaled up for plotting
                 #    r_list += f'{round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
                 if featured('range'):
                     r_list += f'{longDelta[iFrame]:>6}{avgDelta[iFrame]:>7}'
@@ -2271,9 +2291,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 entries[thisTime] = r_list
                     
         # ---   print the comparisons    -------------------------
-        head1  = "  ;    ; ;     ;  bg ;  bg ; target; target; target; target;       ;      ;    "
-        head2  = "  ; UTC; ; UNIX;accel;brake;   low ;  high ;  low  ;  high ;       ;      ;    "
-        head3  = "id;time;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; act"
+        head1  = "  ;    ; ;     ;  bg ;  bg ; target; target; target; target;       ;      ;  eff.;  tol.;    "
+        head2  = "  ; UTC; ; UNIX;accel;brake;   low ;  high ;  low  ;  high ;       ;      ; iobTH; iobTH;    "
+        head3  = "id;time;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; emul ; emul ; act"
         
         head1 += "; auto; final; dura;     ; lin.fit; "
         head2 += "; sens;  ISF; min-; dura ;  min-  ; lin.fit"
@@ -2342,7 +2362,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 tabz += f'{bg[getBgTimeIndex(i)]:>4}; '         # negative acceleration
             else:                tabz += '    ; '               # positive acceleration
             tabz += f'{origTarLow[i]:>4};{origTarHig[i]:>3};{emulTarLow[i]:>4};{emulTarHig[i]:>3}; ' 
-            tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(activity[i]/1000,3):>6}; ' 
+            tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(emuliobTH[i]*0.1,2):>5}; {round(emuliobTH[i]*0.13,2):>5}; {round(activity[i]/1000,3):>6}; ' 
             tabz += f'{round(origAs_ratio[i]/10,2):>5};'                # {round(emulAs_ratio[i]/10,2):>5};' 
             tabz += f'{round(origAI_ratio[i]/10,2):>6}; ' 
             tabz += f'{longDelta[i]:>7}; {avgDelta[i]:>7};' 
@@ -2412,23 +2432,23 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             xyf.write(tabz.replace('.', my_decimal) + '\n')
         
         sepLine = ''
-        sepLine += 265 * '-'
+        sepLine += 271 * '-'
         sepLine += '\n'
         tabz = ';Minimum:;;; '+ f'{min_bg:>22}' \
-             + f';;;;;;;;;{round(min_origAS/10,2):>45}; {round(min_origAI/10,2):>5}' \
+             + f';;;;;;;;;;;{round(min_origAS/10,2):>57}; {round(min_origAI/10,2):>5}' \
              + f';;;;;;;;;{round(min_emulAS/10,2):>67}' \
              + f';{round(min_acceISF,2):>6};{round(min_BZ_ISF,2):>6};{round(min_pp_ISF,2):>6};{round(min_Delta_ISF,2):>6};{round(min_dura_ISF,2):>5}' \
              + f';;{round(min_origISF,1):>11};{round(min_profISF,1):>6};{round(min_emulISF,1):>6}' \
              + f';;;;;{round(min_origSMB,1):>35}; {round(min_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
         tabz = ';Maximum:;;; '+ f'{max_bg:>22}' \
-             + f';;;;;;;;;{round(max_origAS/10,2):>45}; {round(max_origAI/10,2):>5}' \
+             + f';;;;;;;;;;;{round(max_origAS/10,2):>57}; {round(max_origAI/10,2):>5}' \
              + f';;;;;;;;;{round(max_emulAS/10,2):>67}' \
              + f';{round(max_acceISF,2):>6};{round(max_BZ_ISF,2):>6};{round(max_pp_ISF,2):>6};{round(max_Delta_ISF,2):>6};{round(max_dura_ISF,2):>5}' \
              + f';;{round(max_origISF,1):>11};{round(max_profISF,1):>6};{round(max_emulISF,1):>6}' \
              + f';;;;;{round(max_origSMB,1):>35}; {round(max_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
-        tabz = ';Totals:'+ ';'*36+f'{round(origSMBsum,1):>229}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
+        tabz = ';Totals:'+ ';'*38+f'{round(origSMBsum,1):>241}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
 
         """
@@ -2474,9 +2494,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if featured('target'):                          #  6
             head1 += '  avg.'
             head2 += '  targ'
-        if featured('iob'):                             #  6
-            head1 += '      '
-            head2 += '   IOB'
+        if featured('iob'):                             #  12
+            head1 += '        eff.'
+            head2 += '   IOB iobTH'
         if featured('cob'):                             #  6 
             head1 += '      '
             head2 += '   COB'
