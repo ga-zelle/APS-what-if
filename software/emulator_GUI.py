@@ -18,7 +18,7 @@ from emulator_core import log_msg, sub_issue
 from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 def get_version_GUI(echo_msg):
-    echo_msg['emulator_GUI.py'] = '2023-05-02 02:10'
+    echo_msg['emulator_GUI.py'] = '2024-04-25 16:24'
     return echo_msg
 
 
@@ -807,7 +807,7 @@ def sub_emul():
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
-        thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+        loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
         if thisTime == 'SYNTAX':
             runState.set('Emulation halted ... ')
             ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
@@ -821,7 +821,7 @@ def sub_emul():
 
             # load result filenames into resframe
             newaf = afil.get()
-            logListe = glob.glob(newaf, recursive=False)                            # the wild card match
+            logListe = glob.glob(newaf, recursive=False)                        # the wild card match
             filecount = 0
             for fn in logListe:
                 #log_msg("checking result file "+fn)

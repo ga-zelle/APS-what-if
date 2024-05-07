@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2023-12-12 16:57'
+    echo_msg['determine_basal.py'] = '2024-05-03 15:57'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -241,12 +241,12 @@ def loop_smb(microBolusAllowed, profile, iob_data, iobTH_reduction_ratio, Flows)
 
         if 'iob_threshold_percent' in profile :
             iobTHeffective = profile['iob_threshold_percent']
-            if ( not profile['temptargetSet'] and iobTHeffective<100 and profile['meal_addon']>0) : iobTHeffective=iobTHeffective/2 
+            if ( not profile['temptargetSet'] and iobTHeffective<100 and profile['meal_addon']>0) :         iobTHeffective=iobTHeffective/2 
         else:
             iobTHeffective = 100
         if 'profile_percentage' not in profile:     profile['profile_percentage'] = 100
 
-        #console_error('iobTH_reduction_ratio='+str(iobTH_reduction_ratio), 'iobTH='+str(iobTHeffective))
+        #console_error('iobTH_reduction_ratio='+str(iobTH_reduction_ratio), 'iobTHeffective='+str(iobTHeffective))
         
         if not evenTarget:
             console_error("SMB disabled; " +msgType +str(target) +msgUnits +msgEven +msgTail)
@@ -389,7 +389,7 @@ def withinISFlimits(liftISF, minISFReduction, maxISFReduction, sensitivityRatio,
     else :
         final_ISF = min(liftISF, sensitivityRatio)
         if (liftISF <= sensitivityRatio):       origin_sens = ""
-    console_error("final ISF factor is", str(short(round(final_ISF,2))), origin_sens)
+    console_error("final ISF factor is", str(short(round(final_ISF,2))) + origin_sens)
     console_error("----------------------------------")
     console_error("end autoISF")
     console_error("----------------------------------")
@@ -944,7 +944,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     console_error("CR:", profile['carb_ratio'])
 
     console_error("----------------------------------")
-    console_error("start autoISF 3.0")
+    console_error("start autoISF", profile['autoISF_version'])
     console_error("----------------------------------")
     #// enable SMB whenever we have COB or UAM is enabled
     #// SMB is disabled by default, unless explicitly enabled in preferences.json
@@ -1238,7 +1238,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         #// so that autotuned CR is still in effect even when basals and ISF are being adjusted by autosens
         Flows.append(dict(title='False; use autosens-adjusted sens\nto counteract \nmeal insulin dosing adjustments', indent='+1', adr='428'))
         csf = sens / profile['carb_ratio']
-    console_error("profile.sens:",short(profile['sens']),"sens:",short(sens),"CSF:",round(csf,2));
+    console_error("profile.sens:",short(round(profile['sens'],1)),"sens:",short(round(sens,1)),"CSF:",round(csf,2));
     maxCarbAbsorptionRate = 30      #// g/h; maximum rate to assume carbs will absorb if no CI observed
     #// limit Carb Impact to maxCarbAbsorptionRate * csf in mg/dL per 5m
     maxCI = round(maxCarbAbsorptionRate*csf*5/60,1)
@@ -1779,7 +1779,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     carbsReq = (bgUndershoot - zeroTempEffect) / csf - COBforCarbsReq
     zeroTempEffect = round(zeroTempEffect)
     carbsReq = round(carbsReq)
-    console_error("naive_eventualBG:", naive_eventualBG, "bgUndershoot:", short(bgUndershoot), "zeroTempDuration:", zeroTempDuration, "zeroTempEffect:", zeroTempEffect, "carbsReq:", carbsReq)
+    console_error("naive_eventualBG:", naive_eventualBG, "bgUndershoot:", short(round(bgUndershoot,1)), "zeroTempDuration:", zeroTempDuration, "zeroTempEffect:", zeroTempEffect, "carbsReq:", carbsReq)
     Fcasts['Levels']['naive_eventualBG'] = naive_eventualBG
     if ( carbsReq >= profile['carbsReqThreshold'] and minutesAboveThreshold <= 45 ) :
         rT['carbsReq'] = carbsReq
