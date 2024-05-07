@@ -12,7 +12,7 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2023-07-13 01:15'
+    echo_msg['emulator_batch.py'] = '2024-04-25 13:53'
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
@@ -71,10 +71,10 @@ def dialog1(Title, btns, default_btn, items, default_item):
             pass
 
 
-def waitNextLoop(arg,varName):                  # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
+def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
     #E started 05.Nov.2019
     if arg == 'Z':                              # no entry found for SMB loop
-        waitSec = 310                           # this shoud include at leat 1 loop
+        waitSec = loopInterval + 10             # this shoud include at leat 1 loop
     else:
         loophh = eval('1'+arg[0:2]) - 100       # handle leading '0'
         loopmm = eval('1'+arg[3:5]) - 100       # handle leading '0'
@@ -87,7 +87,7 @@ def waitNextLoop(arg,varName):                  # arg = hh:mm:ss of last loop ex
         if now_hh<loophh:
             now_hh = 24                         # past midnight
         nowSec = now_hh*3600 + now_mm*60 + now_ss
-        waitSec = LoopSec + 300 + 10 - nowSec   # until next loop including 10 secs spare
+        waitSec = LoopSec + loopInterval + 10 - nowSec   # until next loop including 10 secs spare
         if waitSec<10:
             waitSec = 60                        # was even negative sometimes
     then = datetime.now() + timedelta(seconds=waitSec)
@@ -293,9 +293,9 @@ if IsAndroid :
     #   the display items dialog
     ###########################################################################
     btns = ["Next", "Exit", "Test"]
-    items = ["bg", "target", "iob", "cob", "range", "bestslope", "ISF-factors", "ISFs", "insReq", "SMB", "basal"]
-    width = [5,     6,        6,      6,      13,      13,              37,       21,      13,      11,     12  ]
-    pick  = [0,                                                          6,        7,       8,       9          ]
+    items = ["bg", "target", "iob", "cob", "range", "bestslope", "autosens", "acce_ISF", "bg_ISF", "pp_ISF", "delta_ISF", "dura_ISF", "ISFs", "insReq", "SMB", "basal"]
+    width = [9,     6,        6,      6,      13,      13,             6,         6,        6,         6,         6,           6,       20,      13,      11,     12  ]
+    pick  = [0,               2,                                       6,         7,        8,         9 ,                    10,       11,      12,      13,     14  ]
     while not True:
         default_pick = pick
         pressed_button, selected_items_indexes = mydialog("Pick outputs", btns, items, True, default_pick)
@@ -305,7 +305,7 @@ if IsAndroid :
         elif pressed_button == 0:           break                           # NEXT
         elif pressed_button == 1:           sys.exit()                      # EXIT
         elif pressed_button == 2:                                           # TEST
-            cols = 6                                                        # always: time column
+            cols = 9                                                        # always: time column
             for i in selected_items_indexes:
                 cols += width[i]                                            # add selected column width
             droid.ttsSpeak(str(cols))                                       # tell the sum
@@ -400,7 +400,7 @@ entries = {}
 lastTime = '0'
 while wdhl[0]=='y':                                                                 # use CANCEL to stop/exit
     # All command line arguments known, go for main process
-    thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal)
+    loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal)
     if thisTime == 'SYNTAX':        break                                           # problem in VDF file
     if thisTime == 'UTF8':          break                                           # PATHONUTF8 nor defined or incorrect
     #print('returned vary_ISF_batch:', CarbReqGram, ' minutes:',  CarbReqTime)
@@ -409,25 +409,26 @@ while wdhl[0]=='y':                                                             
         thisStr  = format(thisHour, '%H')
         if thisStr[0] == '0':       thisStr = thisStr[1]                            # could not EVAL('01', only '1')
         thisInt  = eval(thisStr)
-        AlarmGram = CarbReqGram
+        valGram = eval(CarbReqGram+'+0')
+        val_lastCOB = eval(str(lastCOB)+'+0')
         #print("Zeitslot:", thisInt, str(pickExtraCarbs))
-        #print("extra carbs", str(thisInt in pickExtraCarbs), AlarmGram)
-        if (thisInt in pickExtraCarbs) and AlarmGram !='' and eval(AlarmGram)-lastCOB>6:  # only report if min 0,5 BE missing
+        #print("extra carbs", str(thisInt in pickExtraCarbs), valGram, str(lastCOB))
+        if (thisInt in pickExtraCarbs) and valGram !=0 and valGram-val_lastCOB>6:  # only report if min 0,5 BE missing
             AlarmTime = CarbReqTime
             valTime = eval(AlarmTime)
-            valGram = eval(AlarmGram)
+            #valGram = eval(AlarmGram)
             signif  = valTime / valGram
             if signif<5 and thisTime>lastTime:                                      # above threshold of significance
                 droid.ttsSpeak(both_ansage)
                 droid.ttsSpeak(carb_ansage0)
-                droid.ttsSpeak(both_ansage1 + AlarmGram + carb_ansage2 + AlarmTime + carb_ansage3)
+                droid.ttsSpeak(both_ansage1 + str(valGram) + carb_ansage2 + AlarmTime + carb_ansage3)
         #print("extra bolus", str(thisInt in pickMoreSMB), str(extraSMB))
         if (thisInt in pickMoreSMB) and extraSMB>0 and thisTime>lastTime:
             droid.ttsSpeak(textMoreSMB+str(extraSMB)+textUnit)                      # wake up user, also during sleep?
         #print("less  bolus", str(thisInt in pickLessSMB), str(extraSMB))
         if (thisInt in pickLessSMB) and extraSMB<0 and thisTime>lastTime:
             droid.ttsSpeak(textLessSMB+str(extraSMB)+textUnit)                      # wake up user, also during sleep?
-        howLong = waitNextLoop(thisTime, varFile[len(test_dir):-4])
+        howLong = waitNextLoop(loopInterval, thisTime, varFile[len(test_dir):-4])
         lastTime = thisTime        
         time.sleep(howLong)
     else:   break                                                                   # on Windows run only once
