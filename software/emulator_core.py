@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-05-03 15:57'
+    echo_msg['emulator_core.py'] = '2024-05-08 02:54'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -906,7 +906,7 @@ def PrepareSMB(zeile, log, lcount):
         SMBreason['rowON'] = lcount
         SMBreason['whyON'] = what[:-1]
     elif what.find('start autoISF') >=0:                # version of autoISF
-        print('found version info in', what)
+        #print('found version info in', what)
         wo = what.find('ISF ')
         autoISF_version = what[wo:]
     elif what.find('disabling SMB')>0:
