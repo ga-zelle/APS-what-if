@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-05-08 01:33'
+    echo_msg['determine_basal.py'] = '2024-05-10 02:22'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -502,7 +502,7 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
         
         final_ISF = withinISFlimits(liftISF, profile['autoISF_min'], maxISFReduction, sensitivityRatio, origin_sens, profile, high_temptarget_raises_sensitivity, target_bg, normalTarget, stepActivityDetected, stepInactivityDetected) 
         emulAI_ratio[-1] = final_ISF * 10
-        Fcasts['emulISF'] = profile['sens'] / final_ISF
+        Fcasts['emulISF'] = min(720, profile['sens'] / final_ISF)
         return min(720, round(profile['sens'] / final_ISF, 1))                                              #// mod V14j: observe ISF maximum of 720(?)
     elif ( bg_ISF > 1 ) :
         sens_modified = True

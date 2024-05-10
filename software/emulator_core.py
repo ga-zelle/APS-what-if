@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-05-08 02:54'
+    echo_msg['emulator_core.py'] = '2024-05-10 02:23'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -1116,7 +1116,7 @@ def get_currenttemp(lcount, st) :                       # key = 82
 
 def get_profile(lcount, st) :                           # key = 83
     if not newLoop: return
-    key = 'OapsProfile'
+    key = 'OapsProfileAutoIsf'
     wo = st.find(key)
     if wo>0:        # APS3.3-dev format
         Curly= st[wo+len(key):]
