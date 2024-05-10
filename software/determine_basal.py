@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-05-10 02:22'
+    echo_msg['determine_basal.py'] = '2024-05-10 22:32'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -263,7 +263,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
             #    msg = "effective maxIOB " + str(round(profile['max_iob']*iobTH_reduction_ratio,2))
             #else :
             #    msg = "maxIOB "+ str(short(profile['max_iob']))
-            console_error("SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is above effective iobTH "+str(short(iobThEffective))+"% of "+msg)
+            console_error("SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is above effective iobTH "+str(short(iobThEffective)))
             Flows.append(dict(title="SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is above effective iobTH "+str(short(iobThEffective)), indent='1', adr='loop_227'))
             console_error("Loop power level temporarely capped")
             return "iobTH"
@@ -1760,13 +1760,10 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     #if gz_proto:
     if (loop_wanted_smb=='fullLoop') :
         maxDeltaPercentage = 0.3
-        print ('fullLoop', str(maxDeltaPercentage), str(maxDelta), " ")
     elif 'maxDeltaRatio' in new_parameter:
         maxDeltaPercentage = new_parameter['maxDeltaRatio']
-        print ('new_parameter', str(maxDeltaPercentage), str(maxDelta), " ")
     else:
         maxDeltaPercentage = 0.2            # gz half power loop
-        print ('default', str(maxDeltaPercentage), str(maxDelta), " ")
     #elif 'cgmFlatMinutes' in glucose_status:   # not active in in public master - ba mistake?
     #    maxDeltaPercentage = 0.3                # for autoISF  2.2.8
     if ( maxDelta > maxDeltaPercentage * bg ) :                                         ##### allow this change via new_ parameter
