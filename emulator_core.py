@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2023-12-06 02:19'
+    echo_msg['emulator_core.py'] = '2024-05-17 01:44'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -277,7 +277,7 @@ def setVariant(stmp):
     global iob_data
     global meal_data
     global profile
-    global new_parameter
+    global new_parameter, autoISF_version
     ####################################################################################################################################
     # additional parameters collected here
     # these need an according modification in "determine_basal.py"
@@ -304,6 +304,8 @@ def setVariant(stmp):
                 new_parameter['thresholdRatio'] = 0.6           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
             if 'insulinCapBelowTarget' not in new_parameter:
                 new_parameter['insulinCapBelowTarget'] = True   ### add'l parameter; AAPS is fix at False; enable capping below
+        if 'autoISF_version' not in profile:
+            profile['autoISF_version'] = '(older version)'
         if 'enable_autoISF' not in profile:
             profile['enable_autoISF'] = False               ### not known before ai2.2.x
         if 'smb_delivery_ratio' not in profile:
@@ -328,17 +330,21 @@ def setVariant(stmp):
             new_parameter['thresholdRatio'] = 0.5           ### add'l parameter; AAPS is fix at 0.5; I use 0.6 to lift the minimum 
         if 'profile_percentage' not in profile:
             profile['profile_percentage'] = 100             ### not known before ai3.0
-        if 'enableSMB_EvenOn_OddOff' not in profile:
-            profile['enableSMB_EvenOn_OddOff'] = False      ### not known before ai2.2.7
         if 'enableSMB_EvenOn_OddOff_always' not in profile:
             profile['enableSMB_EvenOn_OddOff_always'] = False  ### not known before ai2.2.8
+        if 'enableSMB_EvenOn_OddOff' not in profile:
+            profile['enableSMB_EvenOn_OddOff'] = profile['enableSMB_EvenOn_OddOff_always']  ### not known before ai2.2.7; default after 3.0.1
         if 'enable_pp_ISF_always' not in profile:
-            profile['enable_pp_ISF_always'] = False         ### not known before ai2.2.7
+            profile['enable_pp_ISF_always'] = True          ### not known before ai2.2.7; default after 3.0.1
+        if 'pp_ISF_hours' not in profile:
+            profile['pp_ISF_hours'] = 0                     ### not known before ai2.2.7 or after 3.0.1
+        if 'delta_ISFrange_weight' not in profile:
+            profile['delta_ISFrange_weight'] = 0.0          ### not known                   after 3.0.1
         if 'enable_dura_ISF_with_COB' not in profile:
             profile['enable_dura_ISF_with_COB'] = False     ### not known before without ai
-        if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
-            profile['activity_detection'] = False       ### not known before without ai
-        if profile['activity_detection']:
+        #if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
+        #    profile['activity_detection'] = False       ### not known before without ai
+        if 'activity_detection' in profile and profile['activity_detection']:
             if 'activity_weight' in profile:
                 profile['activity_scale_factor'] = profile['activity_weight' ]
                 profile['inactivity_scale_factor'] = profile['inactivity_weight' ]
@@ -352,6 +358,8 @@ def setVariant(stmp):
             if 'inactivity_idle_start' not in profile:
                 profile['inactivity_idle_start'] = 0
                 profile['inactivity_idle_end'] = 0
+        if 'parabola_fit_source' not in profile:            ### predating A3.2.0.2 Libre3
+            profile['parabola_fit_source'] = 5              ### standard CGMs at 5m interval
         if AAPS_Version == '<2.7':                          
             profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
             profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
@@ -608,15 +616,78 @@ def getOrigPred(predBGs):
     #print ('orig preds --> '+str(Fcasts))
     return Fcasts
 
+def TreatLoop33(st, log, lcount, fn):
+    if not newLoop: return
+    key = 'resultJson='
+    wo = st.find(key)
+    Curly= hole(st, 1+wo, '{', '}')
+    wo_apo = Curly.find("\'")
+    if wo_apo>0:
+        Curly = Curly[:wo_apo-1]+Curly[wo_apo:]
+    rt = json.loads(Curly)
+    global SMBreason, origAI_ratio
+    SMBreason = {}                                              # clear for first filtered debug list
+    SMBreason['script'] = '---------- Script Debug --------------------\n'
+    for ele in range(len(rt['consoleError'])):
+        what = rt['consoleError'][ele]
+        #print(what)
+        SMBreason['script'] += what +'\n'
+        if str(what).find('---')==0:
+            pass
+        elif what.find('SMB enabled')==0:
+            SMBreason['rowON'] = lcount
+            SMBreason['whyON'] = what[:-1]
+        elif what.find('disabling SMB')>0:
+            SMBreason['rowOFF'] = lcount
+            SMBreason['whyOFF'] = what[:-1]
+        elif what.find('maxBolus: ')>0:
+            SMBreason['maxSMB'] = what[-4:-1]
+        elif what.find('gz maximSMB: from ')==0:
+            SMBreason['maxBolus'] = what[:-1]
+        elif what.find('currenttemp:')==0:                  # unclear source of TempAge, but should be the same in emulation
+            wo_anf = what.find('lastTempAge:')
+            wo_end = what.find(' m tempModulus:')
+            SMBreason['lastTempAge'] = eval(what[wo_anf+13:wo_end])
+            #print('lastTempAge', str(SMBreason['lastTempAge']), 'found in row', str(lcount), 'from', what)
+        elif what.find('ISF unchanged:')==0:                # first reference
+            SMBreason['origISF'] = eval(what[16:-1])
+            #print (str(lcount), str(origISF))
+        elif what.find('ISF from ')==0:                     # here, insert the original autosens modified line handling
+            isf_anf = what.find(' to ')
+            SMBreason['origISF'] = eval(what[isf_anf+4:-1])
+            #print (str(lcount), str(origISF))
+        elif what.find('profile.sens:')==0:                 # redefine it
+            isf_anf = what.find(' sens:')
+            isf_end = what.find(' CSF:')
+            SMBreason['origISF'] = eval(what[isf_anf+6:isf_end])
+            #print (str(lcount), str(origISF))
+        elif what.find('final ISF factor is') ==0:          # result of autoISF
+            final_ISF_string = what[20:]
+            wo = final_ISF_string.find(' ')                # origin sens can  be appended
+            if wo<1:       wo = len(final_ISF_string)
+            
+            origAI_ratio.append(eval(final_ISF_string[:wo])*10)
+    for ele in range(len(rt['consoleLog'])):
+        #print(rt['consoleLog'][what])
+        SMBreason['script'] += rt['consoleLog'][ele] +'\n'
+    #print(rt['reason'])
+    #SMBreason['script'] += rt['reason'] +'\n'
+    SMBreason['origISF'] = rt['variable_sens']
+    
+    cont = TreatLoop(Curly, log, lcount, fn)
+    return cont
+
 def TreatLoop(Curly, log, lcount, fn):
     global SMBreason, newLoop
     global loop_mills, loop_label, bgTimeMap, bgTime, bg
     global origInsReq
+    global emuliobTH, tolerance_iobTH
     global origSMB, emulSMB
     global origMaxBolus, emulMaxBolus
     global origBasal, lastBasal
     global longDelta, avgDelta, longSlope, rateSlope, glucose_status, origISF, BZ_ISF, Delta_BZ, emulISF, origAI_ratio, emulAI_ratio
     global Pred, FlowChart, Fits
+    global  CarbReqGram, CarbReqTime, lastCOB
     #print('\nentered TreatLoop for row '+str(lcount)+' ending with  /'+Curly[-1]+'/ having '+Curly[780:800]+'\n'+Curly)
     wo_apo = Curly.find("\'")
     if wo_apo>0:
@@ -629,6 +700,7 @@ def TreatLoop(Curly, log, lcount, fn):
     #print('zeile', str(lcount), '\n'+(Curly))
     smb = json.loads(Curly)
 
+    go_on = False
     if 'openaps' in smb and 'reason' in smb['openaps']['suggested']:# otherwise unknown source of entry
         suggest = smb['openaps']['suggested']
         go_on = True
@@ -658,6 +730,15 @@ def TreatLoop(Curly, log, lcount, fn):
             return 'STOP'           # too late; send quit signal
         thisTime = ConvertSTRINGooDate(stmp)
         reason = suggest['reason']
+        if 'carbsReq' in suggest:
+            CarbReqGram = str(suggest['carbsReq'])
+            CarbReqTime = str(suggest['carbsReqWithin'])
+            lastCOB = hole(reason, 1, ' ', ',')[:-1]                #drop trailing COMMA
+        else:
+            CarbReqGram = ' '
+            CarbReqTime = ' '
+            lastCOB = ' '
+        #print(str(lcount), lastCOB, CarbReqGram, CarbReqTime)
         loop_mills.append(round(thisTime/1000, 1) )                 # from millis to secs
         loop_label.append(stmp[11:19] + stmp[-1])                   # include seconds to distinguish entries
         #print('len loop_mills='+str(len(loop_mills))+'; len labels='+str(len(loop_label))+'; mills='+str(bgTime[-1]))
@@ -707,7 +788,8 @@ def TreatLoop(Curly, log, lcount, fn):
         if 'lastTempAge' not in SMBreason:                                  # some Dexcom CGM error
             origcob.append(round(meal_data['mealCOB'], 1))
             SMBreason['lastTempAge'] = 0                                    # most frequent value as my best case
-            SMBreason['origISF'] = profile['sens']                          # take from profile
+            if 'variable_sens' not in smb:
+                SMBreason['origISF'] = profile['sens']                      # take from profile
             Fcasts = {}
             #Fcasts['BZ_ISF'] = profile['sens'] 
             #Fcasts['Delta__ISF'] = profile['sens'] 
@@ -786,6 +868,8 @@ def TreatLoop(Curly, log, lcount, fn):
         acceISF.append(Fcasts['acceISF'])               # was set in determine_basal.py
         dura_ISF.append(Fcasts['dura_ISF'])             # was set in determine_basal.py
         emulISF.append(Fcasts['emulISF'])               # was set in determine_basal.py
+        emuliobTH.append(Fcasts['emuliobTH'])           # was set in determine_basal.py
+        tolerance_iobTH.append(Fcasts['emuliobTH']*1.3) # 30% overrun tolerated
 
         if reason.find('COB: 0,') == 0: 
             Fcasts['COBpredBGs'] = []                   # clear array if COB=0
@@ -810,7 +894,7 @@ def code_error(lcount, mess):
 def PrepareSMB(zeile, log, lcount):
     if not newLoop: return
     # collect SMB detail echos before actual, compacted loop protocol comes
-    global SMBreason, origAI_ratio
+    global SMBreason, origAI_ratio, autoISF_version
     key_str = ']:'
     what_anf = zeile.find(key_str)
     what = zeile[what_anf+len(key_str)+1:]
@@ -821,6 +905,10 @@ def PrepareSMB(zeile, log, lcount):
     if what.find('SMB enabled')==0:
         SMBreason['rowON'] = lcount
         SMBreason['whyON'] = what[:-1]
+    elif what.find('start autoISF') >=0:                # version of autoISF
+        #print('found version info in', what)
+        wo = what.find('ISF ')
+        autoISF_version = what[wo:]
     elif what.find('disabling SMB')>0:
         SMBreason['rowOFF'] = lcount
         SMBreason['whyOFF'] = what[:-1]
@@ -849,7 +937,10 @@ def PrepareSMB(zeile, log, lcount):
          final_ISF_string = what[20:]
          wo = final_ISF_string.find(' ')                # origin sens can  be appended
          if wo<1:       wo = len(final_ISF_string)
-         origAI_ratio.append(eval(final_ISF_string[:wo])*10)
+         if final_ISF_string[:wo] == "NaN":
+            origAI_ratio.append(1.0*10)
+         else:
+            origAI_ratio.append(eval(final_ISF_string[:wo])*10)
     pass
 
 def featured(Option):
@@ -861,11 +952,35 @@ def featured(Option):
     return OK
 
 def get_glucose_status(lcount, st) :                    # key = 80
-    Curly = st[16:]
+    key = 'GlucoseStatus'
+    wo = st.find(key)
+    if wo>0:        # APS3.3-dev format
+        Curly= st[wo+len(key):]
+    else:
+        Curly = st[16:]
     global glucose_status
     global bg, bgTime, deltas
     global newLoop
     newLoop = True
+    #print('vorher: ', Curly+'/')
+    if Curly[0]=='(':       # Milos new non-json format
+        if Curly[-1] != ')':     Curly  = Curly[:-1]
+        Curly = ' ' + Curly[1:-1].replace('=', '":')
+        Curly = Curly.replace(' ', '"')
+        Curly = Curly.replace('shortAvgDelta', 'short_avgdelta')
+        Curly = Curly.replace('longAvgDelta', 'long_avgdelta')
+        Curly = Curly.replace('duraISFminutes', 'dura_ISF_minutes')
+        Curly = Curly.replace('duraISFaverage', 'dura_ISF_average')
+        Curly = Curly.replace('parabolaMinutes', 'parabola_fit_minutes')
+        Curly = Curly.replace('deltaPl', 'parabola_fit_last_delta')
+        Curly = Curly.replace('deltaPn', 'parabola_fit_next_delta')
+        Curly = Curly.replace('corrSqu', 'parabola_fit_correlation')
+        Curly = Curly.replace('a0', 'parabola_fit_a0')
+        Curly = Curly.replace('a1', 'parabola_fit_a1')
+        Curly = Curly.replace('a2', 'parabola_fit_a2')
+        Curly = Curly.replace('bgAcceleration', 'bg_acceleration')
+        Curly = '{' + Curly + '}'
+        #print('nachher:', Curly)
     glucose_status = json.loads(Curly)
     glucose_status['row'] = lcount
     #print('entered glucose_status for row='+str(lcount)+'  loop_mills='+'loop_mills[-1]' + '  total count='+str(len(bg))+' with\n '+Curly)
@@ -919,12 +1034,31 @@ def get_glucose_status(lcount, st) :                    # key = 80
 
 def get_iob_data(lcount, st, log) :                     # key = 81
     if not newLoop: return
-    if isZip:
-        Curly = st[16:]                                 # zip format: dropped the <LF> earlier
-    else:
-        Curly = st[16:-1]                               # drop the <CRLF>
+    if not isZip:
+        st = st[:-1]                               # drop the <CRLF>
     global iob_data
     global activity
+    key = 'IobTotal'
+    wo = st.find(key)
+    if wo>0:        # APS3.3-dev format
+        Curly= st[wo+len(key):]
+    else:
+        Curly = st[16:]
+    #print('vorher: ', Curly[:165])
+    if Curly[0]=='(':       # Milos new non-json format
+        Curly = ' ' + Curly[1:-1].replace('=', '":')
+        Curly = Curly.replace('), ', '},"')
+        Curly = Curly.replace(' ', '"')
+        Curly = Curly.replace('IobTotal', '')
+        Curly = Curly.replace('(', '{"')
+        Curly = Curly.replace('duraISFaverage', 'dura_ISF_average')
+        Curly = Curly.replace('parabolaMinutes', 'parabola_fit_minutes')
+        Curly = Curly.replace('deltaPl', 'parabola_fit_last_delta')
+        Curly = Curly.replace('deltaPn', 'parabola_fit_next_delta')
+        Curly = Curly.replace('"{', '{')
+        Curly = '[{' + Curly + '}]'
+        #print('nachher:', Curly[:170])
+        #print('400-420:/'+ Curly[:420] +'/')
     iob_array = json.loads(Curly)
     iob_data = {}
     iob_data['typeof']  = 'dummy'                       # may be anything
@@ -956,8 +1090,24 @@ def get_iob_data(lcount, st, log) :                     # key = 81
 
 def get_currenttemp(lcount, st) :                       # key = 82
     if not newLoop: return
-    Curly = st[16:]
+    key = 'CurrentTemp'
+    wo = st.find(key)
+    if wo>0:        # APS3.3-dev format
+        Curly= st[wo+len(key):]
+    else:
+        Curly = st[16:]
     global currenttemp
+    #print('vorher: ', Curly)
+    if Curly[0]=='(':       # Milos new non-json format
+        #print('step 0:', Curly[len(Curly)-1:])
+        if Curly[-1] != ')':     Curly  = Curly[:-1]
+        #print('step 1:', Curly)
+        Curly = ' ' + Curly[1:-1].replace('=', '":')
+        #print('step 2:', Curly)
+        Curly = Curly.replace(' ', '"')
+        #print('step 3:', Curly)
+        Curly = '{' + Curly + '}'
+        #print('nachher:', Curly)
     currenttemp = json.loads(Curly)
     currenttemp["typeof"] ="dummy"                      # may be anything
     currenttemp["row"] = lcount
@@ -966,9 +1116,26 @@ def get_currenttemp(lcount, st) :                       # key = 82
 
 def get_profile(lcount, st) :                           # key = 83
     if not newLoop: return
-    Curly = st[16:]
+    key = 'OapsProfileAutoIsf'
+    wo = st.find(key)
+    if wo>0:        # APS3.3-dev format
+        Curly= st[wo+len(key):]
+    else:
+        Curly = st[16:]
     global profile, profISF
     global origTarLow, origTarHig, emulTarLow, emulTarHig
+    #print('\nvorher: ', Curly)
+    if Curly[0]=='(':       # Milos new non-json format
+        if Curly[-1] != ')':     Curly  = Curly[:-1]
+        Curly = ' ' + Curly[1:-1].replace('=', '":')
+        Curly = Curly.replace(' ', '"')
+        Curly = Curly.replace('out_units":', 'out_units":"')
+        Curly = Curly.replace('mmol/L,', 'mmol/L",')
+        Curly = Curly.replace('"autoISF_version":,', '"autoISF_version":"",')       # other mode or plugin
+        Curly = Curly.replace('dl,"lgsThreshold', 'dl","lgsThreshold')
+        Curly = '{' + Curly + '}'
+        #print('\nnachher:', Curly)
+        #print('char 959:', Curly[950:965])  #, str(chr(Curly[948])))
     profile = json.loads(Curly)
     #profile['maxDeltaRatio'] = 0.2                     ### moved to new_parameter: additional parameter; define standard
     profile['row'] = lcount
@@ -995,8 +1162,20 @@ def get_profile(lcount, st) :                           # key = 83
 
 def get_meal_data(lcount, st) :                         # key = 84
     if not newLoop: return
-    Curly = st[16:]
+    key = 'MealData'
+    wo = st.find(key)
+    if wo>0:        # APS3.3-dev format
+        Curly= st[wo+len(key):]
+    else:
+        Curly = st[16:]
     global meal_data
+    #print('vorher: ', Curly)
+    if Curly[0]=='(':       # Milos new non-json format
+        if Curly[-1] != ')':     Curly  = Curly[:-1]
+        Curly = ' ' + Curly[1:-1].replace('=', '":')
+        Curly = Curly.replace(' ', '"')
+        Curly = '{' + Curly + '}'
+        #print('nachher:', Curly)
     meal_data = json.loads(Curly)
     meal_data['row'] = lcount
     # use fixed settings for the time being ...
@@ -1005,12 +1184,43 @@ def get_meal_data(lcount, st) :                         # key = 84
     #print ('meal data json -->      '+str(meal_data))
     pass
 
+def get_autoISF_extras(lcount, Curly):
+    Curly = Curly.replace('autoISF_min".0.', 'autoISF_min":0.')     # initial formatting bug
+    #print('entered get_autoISF_extras in row',str(lcount), Curly+ '/\n'+Curly[645:655])
+    if not newLoop: return
+    autoISF_extras = json.loads(Curly)
+    global profile
+    for ele in autoISF_extras:
+        profile[ele] = autoISF_extras[ele]
+    #print (str(profile))
+    pass
+
 def get_autosens_data(lcount, st) :                     # key = 86
     if not newLoop: return
-    Curly = st[16:]
+    key = 'AutosensResult'
+    wo = st.find(key)
+    if wo>0:        # APS3.3-dev format
+        Curly= st[wo+len(key):]
+    else:
+        Curly = st[16:]
     global autosens_data, profile
     global origAs_ratio, autoISF
-    autosens_data = json.loads(Curly)
+    #print('zeile:'+str(lcount),' vorher:\n', Curly)
+    if Curly[0]=='(':       # Milos new non-json format
+        ratio_str = hole(Curly, 0, '=', ',')
+        autosens_data = {}
+        autosens_data['ratio'] = eval(ratio_str[1:-1])
+        #if Curly[-1] != ')':     Curly  = Curly[:-1]
+        #Curly = '"' + Curly[1:-1].replace('=', '":')
+        #Curly = Curly.replace(', ', ', "')
+        #Curly = Curly.replace('sensResult":', 'sensResult":"')
+        #Curly = Curly.replace(', "pastSensitivity":', '", "pastSensitivity":"')
+        #Curly = Curly.replace(', "ratioLimit":', '", "ratioLimit":"')
+        #Curly = Curly.replace(', "ratioFromTdd', '", "ratioFromTdd')
+        #Curly = '{' + Curly + '}'
+        #print('nachher:\n', Curly)
+    else:
+        autosens_data = json.loads(Curly)
     autosens_data['typeof'] = 'dummy'                   # may be anything
     autosens_data['row'] = lcount
     if len(origAs_ratio) ==len(loop_mills) :
@@ -1019,6 +1229,18 @@ def get_autosens_data(lcount, st) :                     # key = 86
     else:
         origAs_ratio[-1] = (autosens_data['ratio']*10)
         autoISF[-1] = (profile['sens'] / autosens_data['ratio'])    # ISF assigned now as autosense is the last data block
+    pass
+
+def get_AutoIsfMode(lcount, st) :
+    if not newLoop: return
+    global AutoIsfMode
+    AutoIsfMode = (st.find('true') > 16)
+    pass
+
+def get_flatBGsDetected(lcount, st) :
+    if not newLoop: return
+    global flatBGsDetected
+    flatBGsDetected = (st.find('true') > 16)
     pass
 
 def get_MicroBolusAllowed(lcount, st) :                 # key = 90
@@ -1045,9 +1267,13 @@ def ConvertSTRINGooDate(stmp) :
     elif stmp < "2022-10-30T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2022
     elif stmp < "2023-03-26T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2022/3
-    else:
+         dlst =    0                                 # no dlst period winter 2022/23
+    elif stmp < "2023-10-26T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2023
+    elif stmp < "2024-03-31T02:00:00.000Z":
+         dlst =    0                                 # no dlst period winter 2023/24
+    else:
+         dlst = 3600                                 #    dlst period summer 2024
     MSJahr		= eval(    stmp[ 0:4])
     MSMonat		= eval('1'+stmp[ 5:7]) -100
     MSTag		= eval('1'+stmp[ 8:10])-100
@@ -1164,7 +1390,9 @@ def scanLogfile(fn, entries):
                     elif Block2[:-3] == '[DetermineBasalAdapterAMAJS.invoke():':                                                   # various input items for loop
                         log_msg('\nSorry, this tool is currently only available for oref1 with SMB\n')
                         return 'STOP'
-                    elif re.match(r"\[DetermineBasalAdapter[A-Za-z]+\.invoke\(\)", Block2): # loop inputs or result record
+                    elif re.match(r"\[DetermineBasalAdapter[A-Za-z]+\.invoke\(\)", Block2) \
+                      or re.match(r"\[OpenAPSAutoISFPlugin\.invoke\(\)", Block2) \
+                      or re.match(r"\[OpenAPSSMBPlugin.invoke\(\)", Block2):  # loop inputs or result record
                         key_anf = Block2.find('):')
                         key_end = Block2.find(']:')
                         dataType= eval(Block2[key_anf+2:key_end])
@@ -1193,15 +1421,18 @@ def scanLogfile(fn, entries):
                             #version_set = True                              # keep until next logfile is loaded
                             pass
                         #elif Block2[:-4] == '[DetermineBasalAdapterSMBJS.invoke():':  # various input items for loop
-                        #print (str(lcount), str(dataType), str(dataType_offset), dataTxt + dataStr[17:60])
                         if   dataTxt[:16] == 'RhinoException: ' :           code_error(lcount, dataStr)
-                        elif dataTxt      == 'Glucose status: {' :          get_glucose_status(lcount, dataStr)
-                        elif dataTxt      == 'IOB data:       [' :          get_iob_data(lcount, dataStr, log)
-                        elif dataTxt      == 'Current temp:   {' :          get_currenttemp(lcount, dataStr)
-                        elif dataTxt      == 'Profile:        {' :          get_profile(lcount, dataStr)
-                        elif dataTxt      == 'Meal data:      {' :          get_meal_data(lcount, dataStr)
-                        elif dataTxt      == 'Autosens data:  {' :          get_autosens_data(lcount, dataStr)
+                        elif dataTxt[:16] == 'Glucose status: ' :           get_glucose_status(lcount, dataStr)
+                        elif dataTxt[:16] == 'IOB data:       ' :           get_iob_data(lcount, dataStr, log)
+                        elif dataTxt[:16] == 'Current temp:   ' :           get_currenttemp(lcount, dataStr)
+                        elif dataTxt[:16] == 'Profile:        ' :           get_profile(lcount, dataStr)
+                        elif dataTxt[:16] == 'Meal data:      ' :           get_meal_data(lcount, dataStr)
+                        elif dataTxt[:16] == 'Autosens data:  ' :           get_autosens_data(lcount, dataStr)
+                        elif dataTxt      == 'AutoIsfMode:     ' :          get_AutoIsfMode(lcount, dataStr)
+                        elif dataTxt      == 'flatBGsDetected: ' :          get_flatBGsDetected(lcount, dataStr)
                         elif dataTxt      == 'MicroBolusAllowed' :          get_MicroBolusAllowed(lcount, dataStr)
+                        #elif dataTxt     == 'Result: RT(algori' :          cont = TreatLooop33(dataStr, log, lcount, fn)
+                        elif dataTxt[:16] == 'AutoISF extras: ' :           get_autoISF_extras(lcount, hole(sLine, 1+sOffset+len(Block2), '{', '}'))
                         elif dataTxt      == 'Result: {"temp":"' :
                                                                             checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.6.1
                                                                             cont = TreatLoop(dataStr[8:], log, lcount, fn)
@@ -1210,6 +1441,7 @@ def scanLogfile(fn, entries):
                         #elif dataType == dataType_offset+147:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 Wolfgang Spänle
                         #elif dataType == dataType_offset+146:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 / Phillip
                         #else:   print('unknown', dataTxt)
+                        #else:   print (str(lcount), str(dataType), str(dataType_offset), '/'+dataTxt+'/' + dataStr[17:60])
                         pass
                     elif Block2 == '[LoggerCallback.jsFunction_log():39]' \
                     or   Block2 == '[LoggerCallback.jsFunction_log():42]' \
@@ -1230,6 +1462,10 @@ def scanLogfile(fn, entries):
                             #and 'lastTempAge' in SMBreason :   
                             cont = TreatLoop(Curly, log, lcount, fn)
                             if cont=='STOP' or cont=='SYNTAX':     return cont
+                    elif zeile.find('[PersistenceLayerImpl$insertOrUpdateApsResult$2.apply():') > 0:
+                                                                            cont = TreatLoop33(zeile, log, lcount,fn)
+                                                                            if cont=='STOP' or cont=='SYNTAX':     return cont
+                    #elif lcount>1400 and lcount<2000:   print('no match in row'+str(lcount)+':', Block2)
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
                     #print('calling TreatLoop in row '+str(lcount)+' with\n'+Curly)
@@ -1539,6 +1775,7 @@ def XYplots(loopCount, head1, head2, entries) :
     
     if len(loop_mills) < len(origcob)       :   origcob.pop()
     if len(loop_mills) < len(origiob)       :   origiob.pop()
+    if len(loop_mills) < len(emuliobTH)     :   emuliobTH.pop()
     if len(loop_mills) < len(origAs_ratio)  :   origAs_ratio.pop()
     if len(loop_mills) < len(emulAs_ratio)  :   emulAs_ratio.pop()
     if len(loop_mills) < len(origAI_ratio)  :   origAI_ratio.pop()
@@ -1548,6 +1785,8 @@ def XYplots(loopCount, head1, head2, entries) :
     # ---   complete the curves to close the polygon for area fill
     cob_area = []
     iob_area = []
+    i_iobTH  = []
+    t_iobTH  = []
     looparea = []
     cob_area.append(0)                      # top left corner
     iob_area.append(0)                      # top left corner
@@ -1557,6 +1796,8 @@ def XYplots(loopCount, head1, head2, entries) :
         cob_area.append(origcob[i])             # the regular data
         iob_area.append(origiob[i])             # the regular data
         looparea.append(lopmil)
+        t_iobTH.append(lopmil)
+        i_iobTH.append(emuliobTH[i])
         i += 1
     cob_area.append(0)                      # bottom left corner
     iob_area.append(0)                      # bottom left corner
@@ -1788,7 +2029,16 @@ def XYplots(loopCount, head1, head2, entries) :
                     if featured('iob') :                                                    # plot IOB
                         axbg.plot(origiob,  loop_mills, linestyle='solid',              color='blue',   label='IOB(x10)')
                         axbg.fill(iob_area, looparea, c='blue',   alpha=0.2)
-            
+                        #axbg.plot(emuliobTH,loop_mills, linestyle='dashed',             color='blue',   label='eff. iobTH(x10), emulated')
+                        #axbg.plot(tolerance_iobTH,loop_mills, linestyle='dotted',       color='blue',   label='tol. iobTH(x10), emulated')
+                        #i_iobTH = emuliobTH
+                        #t_iobTH = loop_mills
+                        for i in range(len(emuliobTH)-1, 0, -1):
+                            i_iobTH.append(tolerance_iobTH[i])
+                            t_iobTH.append(loop_mills[i])
+                        i_iobTH.append(tolerance_iobTH[0])
+                        t_iobTH.append(t_iobTH[0])                        
+                        axbg.fill(i_iobTH, t_iobTH,              alpha=0.4,              color='cyan',   label='iobTH tolerance band(x10), emulated')           
                     if featured('cob') :                                                    # plot COB
                         axbg.plot(origcob,  loop_mills, linestyle='solid',              color='orange', label='COB')
                         axbg.fill(cob_area, looparea, c='orange', alpha=0.4)
@@ -2011,7 +2261,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  origTarLow, emulTarLow, origTarHig, emulTarHig
     global  origAs_ratio, emulAs_ratio              # Autosense
     global  origAI_ratio, emulAI_ratio              # autoISF
-    global  origiob, origcob
+    global  origiob, origcob, origiobTH, emuliobTH, tolerance_iobTH
     global  activity
     global  origInsReq, emulInsReq
     global  origSMB, emulSMB, origMaxBolus, emulMaxBolus
@@ -2048,6 +2298,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     origAI_ratio= []
     emulAI_ratio= []
     origiob     = []
+    origiobTH   = []
+    emuliobTH   = []
+    tolerance_iobTH = []
     origcob     = []
     activity    = []
     
@@ -2095,7 +2348,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     else:
         varFile = varFile + '.vdf'
     if setVariant('1900-01-01T00:00:00'):
-        return  'Z', 0, '', '', 0, ''               # prescan to get parabola fit length
+        return  60, 'Z', 0, '', '', 0, ''               # prescan to get parabola fit length
 
     #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)#   
     logListe = glob.glob(myseek+myfile, recursive=False)
@@ -2107,10 +2360,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         utf8 = os.getenv('PYTHONUTF8', 'undefined')
         if utf8 == 'undefined':
             sub_issue('You need to set the environment variable PYTHONUTF8 first and assign the value 1')
-            return 'UTF8', 0, '', '', 0, ''        # not defined at all
+            return 0, 'UTF8', 0, '', '', 0, ''        # not defined at all
         if utf8 != '1':
             sub_issue('Environment variable PYTHONUTF8 has wrong value '+utf8+', must be value 1')
-            return 'UTF8', 0, '', '', 0, ''        # wrong value
+            return 0, 'UTF8', 0, '', '', 0, ''        # wrong value
         
     # ---   add sorting info    -----------------------------------
     sorted_fn = {}
@@ -2204,12 +2457,15 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
             filecount += 1
-            if cont == 'SYNTAX':    return 'SYNTAX', 0, '', '', 0, ''       # problem in VDF file
-            if cont == 'STOP':      break                                   # end of time window reached
+            if cont == 'SYNTAX':
+                varlog.close()
+                return 0, 'SYNTAX', 0, '', '', 0, ''    # problem in VDF file
+            if cont == 'STOP':
+                break                                   # end of time window reached
     
     if filecount == 0 :
         log_msg ('no such logfile: "'+myseek+'"')
-        return 'Z', 0, '', '', 0, ''
+        return 0, 'Z', 0, '', '', 0, ''
     loopCount = len(loop_mills)
     if loopCount == 0 :
         log_msg ('\nno entries found in logfile: "'+myseek+'"')
@@ -2223,19 +2479,24 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         for iFrame in range(len(loop_label)):
             thisTime = loop_mills[iFrame]
             if thisTime not in entries:                 # holds the rows to be printed on Android or windows
-                r_list = loop_label[iFrame][:5]+'Z'
-                if featured('bg'):      
-                    r_list += f'{bg[getBgTimeIndex(iFrame)]:>6}'
+                r_list = loop_label[iFrame][:8]+'Z'
+                if featured('bg'):
+                    thisBZ = bg[getBgTimeIndex(iFrame)]
+                    if thisBZ>40:
+                        strBZ = str(round(thisBZ, 0)).replace('.0', '')    # mg
+                    else:
+                        strBZ = str(round(thisBZ, 1))                      # mmol
+                    r_list += f'{strBZ:>6}'
                 if featured('target'):
                     r_list += f'{round((origTarLow[iFrame] + origTarHig[iFrame])/2,0):>8}'.replace(".0","")
                 if featured('iob'):     
-                    r_list += f'{round(origiob[iFrame]/10,2):>6}'   # was scaled up for plotting
+                    r_list += f'{round(origiob[iFrame]/10,2):>6}{round(emuliobTH[iFrame]/10,2):>6}'   # scaled up for plotting
                 if featured('cob'):     
                     r_list += f'{round(origcob[iFrame],2):>6}'
                 #if featured('as ratio'):
                 #    r_list += f'{round(origAs_ratio[iFrame]/10,2):>6}'     # was scaled up for plotting
                 #if featured('autoISF'):
-                #    #_list += f'{round(origAI_ratio[iFrame]/10,2):>6} {round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
+                #    #_list += f'{round(origAI_ratio[iFrame]/10,2):>6} {round(emulAI_ratio[iFrame]/10,2):>4}'     # scaled up for plotting
                 #    r_list += f'{round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
                 if featured('range'):
                     r_list += f'{longDelta[iFrame]:>6}{avgDelta[iFrame]:>7}'
@@ -2256,10 +2517,22 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                                 this_List = f'{thisDelta["parabola_fit_minutes"]:>7}{round(thisDelta["parabola_fit_last_delta"],2):>8}'
                                 this_List+= f'{round(thisDelta["parabola_fit_next_delta"],2):>8}'
                     r_list += this_List
-                if featured('ISF') or featured('ISF-factors'): 
-                    r_list += f'{round(emulAs_ratio[iFrame]/10,2):>7}{round(acceISF[iFrame],2):>6}{round(BZ_ISF[iFrame],2):>6}{round(pp_ISF[iFrame],2):>6}{round(Delta_ISF[iFrame],2):>6}{round(dura_ISF[iFrame],2):>6}'
+                #if featured('autosens) or featured('auto'): 
+                #    r_list += f'{round(emulAs_ratio[iFrame]/10,2):>7}{round(acceISF[iFrame],2):>6}{round(BZ_ISF[iFrame],2):>6}{round(pp_ISF[iFrame],2):>6}{round(Delta_ISF[iFrame],2):>6}{round(dura_ISF[iFrame],2):>6}'
+                if featured('autosens') or featured('auto'): 
+                    r_list += f'{round(emulAs_ratio[iFrame]/10,2):>6}'
+                if featured('acce ISF') or featured('acce'): 
+                    r_list += f'{round(acceISF[iFrame],2):>6}'
+                if featured('bg ISF'): 
+                    r_list += f'{round(BZ_ISF[iFrame],2):>6}'
+                if featured('pp ISF') or featured('pp'): 
+                    r_list += f'{round(pp_ISF[iFrame],2):>6}'
+                if featured('delta ISF') or featured('delta'): 
+                    r_list += f'{round(Delta_ISF[iFrame],2):>6}'
+                if featured('dura ISF') or featured('dura'): 
+                    r_list += f'{round(dura_ISF[iFrame],2):>6}'
                 if featured('ISF') or featured('ISFs'):         # 21
-                    r_list += f'{round(origISF[iFrame],1):>9}{round(profISF[iFrame],1):>6}{round(emulISF[iFrame],1):>6}'
+                    r_list += f'{round(origISF[iFrame],1):>8}{round(profISF[iFrame],1):>6}{round(emulISF[iFrame],1):>6}'
                 if featured('insReq'):
                     r_list += f'{origInsReq[iFrame]:>7}{emulInsReq[iFrame]:>6}'
                 if featured('SMB'):
@@ -2269,9 +2542,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 entries[thisTime] = r_list
                     
         # ---   print the comparisons    -------------------------
-        head1  = "  ;    ; ;     ;  bg ;  bg ; target; target; target; target;       ;      ;    "
-        head2  = "  ; UTC; ; UNIX;accel;brake;   low ;  high ;  low  ;  high ;       ;      ;    "
-        head3  = "id;time;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; act"
+        head1  = "  ;    ; ;     ;  bg ;  bg ; target; target; target; target;       ;      ;  eff.;  tol.;    "
+        head2  = "  ; UTC; ; UNIX;accel;brake;   low ;  high ;  low  ;  high ;       ;      ; iobTH; iobTH;    "
+        head3  = "id;time;Z; time;     ;     ;  orig ;  orig ;  emul ;  emul ;  cob  ; iob  ; emul ; emul ; act"
         
         head1 += "; auto; final; dura;     ; lin.fit; "
         head2 += "; sens;  ISF; min-; dura ;  min-  ; lin.fit"
@@ -2340,7 +2613,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 tabz += f'{bg[getBgTimeIndex(i)]:>4}; '         # negative acceleration
             else:                tabz += '    ; '               # positive acceleration
             tabz += f'{origTarLow[i]:>4};{origTarHig[i]:>3};{emulTarLow[i]:>4};{emulTarHig[i]:>3}; ' 
-            tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(activity[i]/1000,3):>6}; ' 
+            tabz += f'{origcob[i]:>5}; {round(origiob[i]/10,2):>5}; {round(emuliobTH[i]*0.1,2):>5}; {round(emuliobTH[i]*0.13,2):>5}; {round(activity[i]/1000,3):>6}; ' 
             tabz += f'{round(origAs_ratio[i]/10,2):>5};'                # {round(emulAs_ratio[i]/10,2):>5};' 
             tabz += f'{round(origAI_ratio[i]/10,2):>6}; ' 
             tabz += f'{longDelta[i]:>7}; {avgDelta[i]:>7};' 
@@ -2410,23 +2683,23 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             xyf.write(tabz.replace('.', my_decimal) + '\n')
         
         sepLine = ''
-        sepLine += 265 * '-'
+        sepLine += 271 * '-'
         sepLine += '\n'
         tabz = ';Minimum:;;; '+ f'{min_bg:>22}' \
-             + f';;;;;;;;;{round(min_origAS/10,2):>45}; {round(min_origAI/10,2):>5}' \
+             + f';;;;;;;;;;;{round(min_origAS/10,2):>57}; {round(min_origAI/10,2):>5}' \
              + f';;;;;;;;;{round(min_emulAS/10,2):>67}' \
              + f';{round(min_acceISF,2):>6};{round(min_BZ_ISF,2):>6};{round(min_pp_ISF,2):>6};{round(min_Delta_ISF,2):>6};{round(min_dura_ISF,2):>5}' \
              + f';;{round(min_origISF,1):>11};{round(min_profISF,1):>6};{round(min_emulISF,1):>6}' \
              + f';;;;;{round(min_origSMB,1):>35}; {round(min_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
         tabz = ';Maximum:;;; '+ f'{max_bg:>22}' \
-             + f';;;;;;;;;{round(max_origAS/10,2):>45}; {round(max_origAI/10,2):>5}' \
+             + f';;;;;;;;;;;{round(max_origAS/10,2):>57}; {round(max_origAI/10,2):>5}' \
              + f';;;;;;;;;{round(max_emulAS/10,2):>67}' \
              + f';{round(max_acceISF,2):>6};{round(max_BZ_ISF,2):>6};{round(max_pp_ISF,2):>6};{round(max_Delta_ISF,2):>6};{round(max_dura_ISF,2):>5}' \
              + f';;{round(max_origISF,1):>11};{round(max_profISF,1):>6};{round(max_emulISF,1):>6}' \
              + f';;;;;{round(max_origSMB,1):>35}; {round(max_emulSMB,1):>4}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
-        tabz = ';Totals:'+ ';'*36+f'{round(origSMBsum,1):>229}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
+        tabz = ';Totals:'+ ';'*38+f'{round(origSMBsum,1):>241}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
 
         """
@@ -2462,23 +2735,23 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     
     if len(entries) == 0:
         sub_issue('\nNo loop data yet in fresh logfile')
-        return 'Z',0, '', '', 0, ''
-    else:                                               #  6
-        head1 = '  UTC '
-        head2 = ' time '
+        return 60, 'Z',0, '', '', 0, ''
+    else:                                               #  9
+        head1 = '    UTC  '
+        head2 = '   time  '
         if featured('bg'):                              #  6     
             head1 += '      '
             head2 += '    bg'
         if featured('target'):                          #  6
             head1 += '  avg.'
             head2 += '  targ'
-        if featured('iob'):                             #  6
-            head1 += '      '
-            head2 += '   IOB'
+        if featured('iob'):                             #  12
+            head1 += '        eff.'
+            head2 += '   IOB iobTH'
         if featured('cob'):                             #  6 
             head1 += '      '
             head2 += '   COB'
-        #if featured('as ratio'):                        #  6
+        #if featured('as ratio'):                       #  6
         #    head1 += '  Auto'
         #    head2 += '  sens'
         #if featured('autoISF'):                         # 11
@@ -2493,12 +2766,39 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if featured('fitsParabola') or featured('bestParabola'):                     # 21
             head1 += '   ----parabola fit----'
             head2 += '   dura  last-Δ  next-Δ'
-        if featured('ISF') or featured('ISF-factors'):  # 31
-            head1 += '   ------------ISF factors-----------'
-            head2 += '   auto  acce   bg    pp  delta  dura'
-        if featured('ISF') or featured('ISFs'):         # 21
-            head1 += '     ------ISFs------' 
-            head2 += '     orig  prof  emul'
+        showISFfactors = False
+        ISFhead1 = ''
+        ISFhead2 = ''
+        if featured('autosens'):                        # 6
+            head1 += '  auto'
+            head2 += '  sens'
+            showISFfactors = True
+        if featured('acce ISF') or featured('acce'):    # 6
+            ISFhead1 += '  acce'
+            ISFhead2 += '   ISF'
+            showISFfactors = True
+        if featured('bg ISF'):                          # 6
+            ISFhead1 += '    bg'
+            ISFhead2 += '   ISF'
+            showISFfactors = True
+        if featured('pp ISF') or featured('pp'):        # 6
+            ISFhead1 += '    pp'
+            ISFhead2 += '   ISF'
+            showISFfactors = True
+        if featured('delta ISF') or featured('delta'):  # 6
+            ISFhead1 += ' delta'
+            ISFhead2 += '   ISF'
+            showISFfactors = True
+        if featured('dura ISF') or featured('dura'):    # 6
+            ISFhead1 += '  dura'
+            ISFhead2 += '   ISF'
+            showISFfactors = True
+        if showISFfactors:                              # 1
+            head1 += '' + ISFhead1
+            head2 += '' + ISFhead2
+        if featured('ISF') or featured('ISFs'):         # 20
+            head1 += '    ------ISFs------' 
+            head2 += '    orig  prof  emul'
         if featured('insReq'):                          # 13
             head1 += '  insulin Req'
             head2 += '   orig  emul'
@@ -2520,7 +2820,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     if isAndroid :
         os.system('clear')
         if len(head1) == 92:    tail = ' '                              # this is double of portrait width
-        log_msg(head1+tail)
+        log_msg('\n'+head1+tail)
         log_msg(head2+tail)                                             # 1 record per print for safe rotations
         for thisTime in sorted_entries[len(sorted_entries)-top10:]:     # last hour plus
             values = entries[thisTime]
@@ -2532,11 +2832,14 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if oldTime not in sorted_entries[len(sorted_entries)-top10:]:
             del entries[oldTime]                                        # no longer in last 14 entries
     if loopCount == 0:
-        return 'Z', 0, '', '', 0, ''
+        return 60, 'Z', 0, '', '', 0, ''
     else:
         extraSMB = emulSMB[loopCount-1] - origSMB[loopCount-1] 
         #print("origSMB="+str(origSMB)+"\nemulSMB="+str(emulSMB))
-        return loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
+        loopInterval = 60
+        if loopCount>0:
+            loopInterval = (loop_mills[-1] - loop_mills[0]) / (loopCount-1) / 1000     # avg. sec per loop
+        return loopInterval, loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
     
 def set_tty(printframe, txtbox, channel):                   # for GIU
     global how_to_print
