@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-05-10 22:32'
+    echo_msg['determine_basal.py'] = '2024-05-16 18:31'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -2018,12 +2018,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         insulinReq = round(insulinReq,3)
         rT['insulinReq'] = insulinReq
         #// console_error('lastBolusTime:', str(iob_data['lastBolusTime']))
-        if profile['autoISF_version'] == '3.0.1' :
-            #// seconds since last bolus
-            lastBolusAge = round(( thisTime - iob_data['lastBolusTime'] ) / 1000,1)
-        else:
-            #// minutes since last bolus
-            lastBolusAge = round(( thisTime - iob_data['lastBolusTime'] ) / 60000,1)
+        lastBolusAge = ( thisTime - iob_data['lastBolusTime'] ) / 1000
         #//console_error(profile.temptargetSet, target_bg, rT.COB);
         #// only allow microboluses with COB or low temp targets, or within DIA hours of a bolus
         if (microBolusAllowed and enableSMB and bg > threshold) :
@@ -2167,18 +2162,20 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 #// allow SMBIntervals between 1 and 10 minutes
                 SMBInterval = min(10, max(1,profile['SMBInterval']))
             SMBInterval = SMBInterval * 60
-            nextBolusMins = round((SMBInterval-lastBolusAge) / 60, 0) 
-            nextBolusSeconds = round((SMBInterval - lastBolusAge), 0) % 60
             #//console_error(naive_eventualBG, insulinReq, worstCaseInsulinReq, durationReq);
-            console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(lastBolusAge/60))+"m ago; maxBolus:", maxBolus)
-            if (lastBolusAge > SMBInterval - 12) :     #// 12s tolerance
+            console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(round(lastBolusAge/60,0)))+"m ago; maxBolus:", maxBolus)
+            if (lastBolusAge > SMBInterval - 6) :     #// 6s tolerance
                 if (microBolus > 0) :
                     rT['units'] = microBolus
                     rT['reason'] += "Microbolusing " + str(short(microBolus)) + "U. "
                     Flows.append(dict(title="Microbolusing " + str(round(microBolus,1)) + "U", indent='0', adr='1095+12'))
             else :
-                rT['reason'] += "Waiting " + str(nextBolusMins) + "m " + str(short(nextBolusSeconds)) + "s to microbolus again. "
-                Flows.append(dict(title="Waiting " + str(nextBolusMins) + ":"+str(nextBolusSeconds+100)[1:3]+"\nto microbolus again", indent='0', adr='1098+12'))
+                nextBolusMins = (SMBInterval-lastBolusAge) / 60 
+                nextBolusSeconds = (SMBInterval - lastBolusAge) % 60
+                waitingSeconds = round(nextBolusSeconds,0) % 60
+                waitingMins = round(nextBolusMins-waitingSeconds/60, 0)
+                rT['reason'] += "Waiting " + str(short(waitingMins)) + "m " + str(short(waitingSeconds)) + "s to microbolus again. "
+                Flows.append(dict(title="Waiting " + str(waitingMins) + ":"+str(waitingSeconds+100)[1:3]+"\nto microbolus again", indent='0', adr='1098+12'))
             #//rT.reason += ". ";
 
             #// if no zero temp is required, don't return yet; allow later code to set a high temp
