@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-05-10 02:23'
+    echo_msg['emulator_core.py'] = '2024-05-17 01:44'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -2457,8 +2457,11 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
             filecount += 1
-            if cont == 'SYNTAX':    return 0, 'SYNTAX', 0, '', '', 0, ''       # problem in VDF file
-            if cont == 'STOP':      break                                   # end of time window reached
+            if cont == 'SYNTAX':
+                varlog.close()
+                return 0, 'SYNTAX', 0, '', '', 0, ''    # problem in VDF file
+            if cont == 'STOP':
+                break                                   # end of time window reached
     
     if filecount == 0 :
         log_msg ('no such logfile: "'+myseek+'"')
@@ -2835,7 +2838,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         #print("origSMB="+str(origSMB)+"\nemulSMB="+str(emulSMB))
         loopInterval = 60
         if loopCount>0:
-            loopInterval = (loop_mills[-1] - loop_mills[0]) / loopCount / 1000     # avg. sec per loop
+            loopInterval = (loop_mills[-1] - loop_mills[0]) / (loopCount-1) / 1000     # avg. sec per loop
         return loopInterval, loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
     
 def set_tty(printframe, txtbox, channel):                   # for GIU
