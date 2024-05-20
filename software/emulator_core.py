@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-05-17 01:44'
+    echo_msg['emulator_core.py'] = '2024-05-20 23:44'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -848,7 +848,11 @@ def TreatLoop(Curly, log, lcount, fn):
         if setVariant(stmp):        return 'SYNTAX'     # syntax problem in VDF file
         
         #if profile['new_parameter']['bestParabola']:       dura_p, delta_p, parabs, iMax = getBestParabolaBG(len(bg)-1)
-        log_msg('Scanning logfile '+fn+ ',  loop time stamp '+stmp,'\r')
+        if isAndroid:
+            msgFile = 'Scanning active logfile'
+        else:
+            msgFile = 'Scanning logfile '+fn       
+        log_msg(msgFile + ',  loop time stamp '+stmp,'\r')
         reT = detSMB.determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, MicroBolusAllowed, reservoir, thisTime, Fcasts, Flows, emulAI_ratio)
         #newLoop = False
         if len(origAI_ratio)<len(emulAI_ratio):
@@ -2810,7 +2814,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             head2 += '   orig   emul'
     
     if isAndroid :
-        maxItems = 12           
+        maxItems = 15          
     else:
         maxItems = len(loop_label)
         if loopCount > 0 :          XYplots(loopCount, head1, head2, entries)
@@ -2837,7 +2841,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         extraSMB = emulSMB[loopCount-1] - origSMB[loopCount-1] 
         #print("origSMB="+str(origSMB)+"\nemulSMB="+str(emulSMB))
         loopInterval = 60
-        if loopCount>0:
+        if loopCount>1:
             loopInterval = (loop_mills[-1] - loop_mills[0]) / (loopCount-1) / 1000     # avg. sec per loop
         return loopInterval, loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
     
