@@ -150,8 +150,10 @@ if len(inh11) > 0:
     fn = test_dir + test_file
     
 if IsAndroid :
-    import androidhelper
-    droid=androidhelper.Android()
+    #import androidhelper
+    #droid=androidhelper.Android()
+    from androidhelper import Android
+    droid = Android()
     #ClearScreenCommand = 'clear'                                           # done in --core.py
     
     #inh = glob.glob(test_dir+'files/AndroidAPS.log')
