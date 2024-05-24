@@ -1,8 +1,7 @@
 This branch is still under development. The new software is fairly stable but the documentation is still in flux.
 Major updates:
-- include the AAPS 3.2.0.2 capabilities
-- include the autoISF3.0 capabilities
-- show effective iobTH values in result files
+- include the AAPS 3.2.0.4 capabilities
+- include the autoISF3.0.a capabilities
 
 This branch is not yet fully tested and may contain bugs. In such cases please contact ga-zelle.
 
