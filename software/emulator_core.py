@@ -2483,7 +2483,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         for iFrame in range(len(loop_label)):
             thisTime = loop_mills[iFrame]
             if thisTime not in entries:                 # holds the rows to be printed on Android or windows
-                r_list = loop_label[iFrame][:8]+'Z'
+                if featured('seconds'):
+                    r_list = loop_label[iFrame][:8]+'Z'
+                else:
+                    r_list = loop_label[iFrame][:5]+'Z'
                 if featured('bg'):
                     thisBZ = bg[getBgTimeIndex(iFrame)]
                     if thisBZ>40:

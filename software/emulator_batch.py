@@ -280,7 +280,7 @@ if IsAndroid :
             arg2 = 'Android/'+my_decimal
             outputJson = json.loads(zeile)
             #print('vorher :', str(outputJson))
-            total_width = 0
+            total_width = 6                         # base time in hh:mmZ
             for ele in outputJson:
                 width = outputJson[ele]
                 if width>0:
