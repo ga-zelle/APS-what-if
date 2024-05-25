@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-05-20 23:44'
+    echo_msg['emulator_core.py'] = '2024-05-24 23:32'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -2743,9 +2743,13 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     if len(entries) == 0:
         sub_issue('\nNo loop data yet in fresh logfile')
         return 60, 'Z',0, '', '', 0, ''
-    else:                                               #  9
-        head1 = '    UTC  '
-        head2 = '   time  '
+    else:
+        if featured ('seconds'):
+            head1 = '    UTC  '                         # 9
+            head2 = '   time  '
+        else:
+            head1 = '  UTC '                            # 6
+            head2 = ' time '
         if featured('bg'):                              #  6     
             head1 += '      '
             head2 += '    bg'
