@@ -1,3 +1,17 @@
+02.Jun.2024
+===========
+Re-enbabled output of DELTA file
+
+
+May 2024
+========
+Adapted for APPS 3.2.0.4
+Adapted for autoISF3.0.1
+Documentation
+- added usage guide for emualtor on phone
+- Libre Office proforma for importing CSV file now has color coded cells when 'orig' and 'emul' deviate
+
+
 25.Nov.2023
 ===========
 Adapted for autoISF3.0
