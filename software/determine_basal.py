@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-05-16 18:31'
+    echo_msg['determine_basal.py'] = '2024-06-02 18:00'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -244,8 +244,8 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
             if ( iobThPercent == iobThUser ) :
                 console_error("User setting iobTH="+str(iobThUser)+"% not modulated")
             else :
-                console_error("User setting iobTH="+str(iobThUser)+"% modulated to "+str(short(round(iobThPercent,2)))+"% or "+str(short(round(iobThEffective,1)))+"U")
-                console_error("due to profile % and/or exercise/activity mode")
+                console_error("User setting iobTH="+str(iobThUser)+"% modulated to "+str(short(round(iobThPercent,2)))+"% or "+str(short(round(iobThEffective,2)))+"U")
+                console_error("due to profile %, exercise mode or similar")
         else :
             console_error("User setting iobTH=100% disables iobTH method")
         
@@ -644,6 +644,8 @@ def activityMonitor(profile, bg, target_bg, thisTime):
     inactivity_idle_end = profile['inactivity_idle_end']
     activityRatio = 1.0
 
+    #print('sleeping', str(inactivity_idle_start), str(inactivity_idle_end), str(hour))
+    
     if ( not activityDetection ) :
         if 'activity_detection' in profile or 'key_activity_detection' in profile:
             console_error("Activity monitor disabled in settings")
@@ -2163,7 +2165,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 SMBInterval = min(10, max(1,profile['SMBInterval']))
             SMBInterval = SMBInterval * 60
             #//console_error(naive_eventualBG, insulinReq, worstCaseInsulinReq, durationReq);
-            console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(round(lastBolusAge/60,0)))+"m ago; maxBolus:", maxBolus)
+            console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(round(lastBolusAge/60,1)))+"m ago; maxBolus:", maxBolus)
             if (lastBolusAge > SMBInterval - 6) :     #// 6s tolerance
                 if (microBolus > 0) :
                     rT['units'] = microBolus
