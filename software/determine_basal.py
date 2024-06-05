@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-06-02 18:00'
+    echo_msg['determine_basal.py'] = '2024-06-05 23:50'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -619,7 +619,7 @@ def determine_varSMBratio(profile, bg, target_bg, loop_wanted_smb, Flows):
     console_error('SMB delivery ratio set to interpolated value', new_SMB)
     return new_SMB
 
-def activityMonitor(profile, bg, target_bg, thisTime):
+def activityMonitor(profile, bg, target_bg, thisTime, utcOffset):
     hour = int(thisTime / 3600 / 1000) % 24
     if hour <1:  hour = 1
         
@@ -640,8 +640,8 @@ def activityMonitor(profile, bg, target_bg, thisTime):
     activity_scale_factor = profile['activity_scale_factor']
     inactivity_scale_factor = profile['inactivity_scale_factor']
     ignore_inactivity_overnight = profile['ignore_inactivity_overnight']
-    inactivity_idle_start = profile['inactivity_idle_start']
-    inactivity_idle_end = profile['inactivity_idle_end']
+    inactivity_idle_start = (profile['inactivity_idle_start'] - utcOffset) % 24
+    inactivity_idle_end = (profile['inactivity_idle_end'] - utcOffset) % 24
     activityRatio = 1.0
 
     #print('sleeping', str(inactivity_idle_start), str(inactivity_idle_end), str(hour))
@@ -805,7 +805,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         rT['error'] ='Error: could not determine target_bg. '
         return rT
 
-    activityRatio = activityMonitor(profile, bg, target_bg, thisTime)   #// stepActivityDetected, stepInactivityDetected);
+    activityRatio = activityMonitor(profile, bg, target_bg, thisTime, iob_data['utcOffset'])   #// stepActivityDetected, stepInactivityDetected);
     stepActivityDetected = False
     stepInactivityDetected = False
     if   (activityRatio<1) :        stepActivityDetected = True

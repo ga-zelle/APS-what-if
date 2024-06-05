@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-05-24 23:32'
+    echo_msg['emulator_core.py'] = '2024-06-05 23:50'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -274,16 +274,18 @@ def setVariant(stmp):
     global glucose_status
     global bg
     global currenttemp
-    global iob_data
+    global iob_data #, utcOffset
     global meal_data
     global profile
     global new_parameter, autoISF_version
     ####################################################################################################################################
     # additional parameters collected here
     # these need an according modification in "determine_basal.py"
-    #rofile['use_autoisf'] = False                      ### not enabled in standard AAPS and not even available
-    new_parameter = {}                                  
-    temp          = {}                                  ### holds interim values in shorter notation
+    #rofile['use_autoisf'] = False                          ### not enabled in standard AAPS and not even available
+    new_parameter = {}
+    #print('\nin set_Variant', str(type('utcOffset')))
+    #new_parameter['utcOffset'] = utcOffset                  ### for Activity Monitor sleeping hours
+    temp          = {}                                      ### holds interim values in shorter notation
     if (stmp != '1900-01-01T00:00:00') :
         # first, do the AAPS standard assignments           ### variations are set in the <variant>.dat file
         new_parameter['maxDeltaRatio'] = 0.2                ### add'l parameter; AAPS is fix at 0.2
@@ -1036,11 +1038,11 @@ def get_glucose_status(lcount, st) :                    # key = 80
     #        print('deltas at '+str(mills), str(deltas[mills]))
     pass
 
-def get_iob_data(lcount, st, log) :                     # key = 81
+def get_iob_data(lcount, st, log, stampStr) :                     # key = 81
     if not newLoop: return
     if not isZip:
         st = st[:-1]                               # drop the <CRLF>
-    global iob_data
+    global iob_data, utcOffset
     global activity
     key = 'IobTotal'
     wo = st.find(key)
@@ -1048,7 +1050,7 @@ def get_iob_data(lcount, st, log) :                     # key = 81
         Curly= st[wo+len(key):]
     else:
         Curly = st[16:]
-    #print('vorher: ', Curly[:165])
+    #print('\nvorher: ', Curly[:165])
     if Curly[0]=='(':       # Milos new non-json format
         Curly = ' ' + Curly[1:-1].replace('=', '":')
         Curly = Curly.replace('), ', '},"')
@@ -1078,14 +1080,23 @@ def get_iob_data(lcount, st, log) :                     # key = 81
             else:
                 origiob[-1] = (act*10)
                 #print('  overwritten', str(origiob[-1]), 'to iorigiob')
-        if ele == 'activity':
+        elif ele == 'activity':
             act = rec_0[ele]
             if len(activity) ==len(loop_mills):
                 activity.append(act*1000)
             else:
                 activity[-1] = (act*1000)
-            
+        elif ele == 'time':
+            #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr)
+            hourOffset = eval('1' + stampStr[0:2]+ '-1' + rec_0[ele][11:13])
+            minuteOffset = eval('1' + stampStr[3:5] + '-1' + rec_0[ele][14:16])
+            utcOffset = round(hourOffset + minuteOffset/60, 0)
+            if   utcOffset >13:     utcOffset -= 24
+            elif utcOffset<-12:     utcOffset += 24
+            #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr, ' UTC offset: '+str(utcOffset))
+            #print('in get_iob_data', str(type('utcOffset')))
     iob_data['iobArray']= iob_array
+    iob_data['utcOffset'] = utcOffset
     #print ('preliminary iob data json -->       '+str(lcount) +' : '+ str(iob_data))
     #for ele in iob_array:
     #    log.write(str(ele)+':'+'\n')
@@ -1427,7 +1438,7 @@ def scanLogfile(fn, entries):
                         #elif Block2[:-4] == '[DetermineBasalAdapterSMBJS.invoke():':  # various input items for loop
                         if   dataTxt[:16] == 'RhinoException: ' :           code_error(lcount, dataStr)
                         elif dataTxt[:16] == 'Glucose status: ' :           get_glucose_status(lcount, dataStr)
-                        elif dataTxt[:16] == 'IOB data:       ' :           get_iob_data(lcount, dataStr, log)
+                        elif dataTxt[:16] == 'IOB data:       ' :           get_iob_data(lcount, dataStr, log, zeile[:8])
                         elif dataTxt[:16] == 'Current temp:   ' :           get_currenttemp(lcount, dataStr)
                         elif dataTxt[:16] == 'Profile:        ' :           get_profile(lcount, dataStr)
                         elif dataTxt[:16] == 'Meal data:      ' :           get_meal_data(lcount, dataStr)
@@ -2709,7 +2720,6 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         tabz = ';Totals:'+ ';'*38+f'{round(origSMBsum,1):>241}; {round(emulSMBsum,1):>4}; {round(origBasalint,2):>9}; {round(emulBasalint,2):>6}'
         xyf.write(tabz.replace('.', my_decimal) + '\n')
 
-        """
         # ---   list all types of delta information    -----------
         #pro = os.system("SET PYTHONUTF8=1")
         #print(str(pro))
@@ -2736,7 +2746,6 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             i += 1
             if i >= len(loop_label):        break
         delta.close()
-        """
 
     xyf.close()
     
