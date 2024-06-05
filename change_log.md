@@ -1,15 +1,12 @@
-04.Jun.2924
+05.Jun.2924
 ===========
-Activity Monitor sleepung hours need to be shifted from local time to UTC.
-That looks like the need to manage UTC offset generally which wili take time.
-**MESZ_inactivity.VDF** in the software folder is an example for that time zone. 
-To adapt for your zone just change the offset in the first line 
-and include those 3 lines in all your VDF files, even the noChange.vdf.
+Activity Monitor sleeping hours need to be shifted from local time to UTC.
+The UTC offset is extracted from the logfiles.
 
 
 02.Jun.2024
 ===========
-Re-enbabled output of DELTA file
+Re-enabled output of DELTA file
 
 
 May 2024
