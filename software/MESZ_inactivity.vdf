@@ -1,3 +1,0 @@
-temp      utcOffset               2                       ### MESZ time zone offset in hours
-profile   inactivity_idle_start   (profile['inactivity_idle_start']-temp['utcOffset']) % 24  ### MESZ version of UTC
-profile   inactivity_idle_end     (profile['inactivity_idle_end']  -temp['utcOffset']) % 24  ### MESZ version of UTC
