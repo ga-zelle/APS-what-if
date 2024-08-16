@@ -866,7 +866,7 @@ runState.set(notRunning)
 tStyle.configure('Done.TLabel', foreground='green')
 tStyle.configure('Error.TLabel', foreground='red')
 ttk.Label(runframe, textvariable=runState).grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
-lfd = Text(runframe, state='disabled', width=146, height=30)                    # w/h in characters
+lfd = Text(runframe, state='disabled', width=178, height=30)                    # w/h in characters
 lfd.grid(column=0, row=runRow+1, columnspan=3)
 lfd['wrap'] = 'none'
 lfd.tag_configure('issue', foreground='red')
