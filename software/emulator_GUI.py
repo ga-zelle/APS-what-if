@@ -52,7 +52,7 @@ tStyle = ttk.Style()
 #tStyle.configure('TNotebook')
 tStyle.configure('Bold.TNotebook.Tab', font='bold', padding=[20,0], background='#AAA')
 book['style'] = 'Bold.TNotebook'
-book.grid(column=0, row=2, columnspan=4, sticky='WN', padx=10, pady=20)
+book.grid(column=0, row=2, columnspan=4, sticky='NESW', padx=10, pady=20)
 inpframe = ttk.Frame(book, relief='raised')
 outframe = ttk.Frame(book, relief='raised')
 resframe = ttk.Frame(book, relief='raised')
@@ -866,8 +866,8 @@ runState.set(notRunning)
 tStyle.configure('Done.TLabel', foreground='green')
 tStyle.configure('Error.TLabel', foreground='red')
 ttk.Label(runframe, textvariable=runState).grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
-lfd = Text(runframe, state='disabled', width=146, height=30)                    # w/h in characters
-lfd.grid(column=0, row=runRow+1, columnspan=3)
+lfd = Text(runframe, state='disabled', width=178, height=30)                    # w/h in characters
+lfd.grid(column=0, row=runRow+1, columnspan=3, sticky='NESW')
 lfd['wrap'] = 'none'
 lfd.tag_configure('issue', foreground='red')
 scrly = ttk.Scrollbar(runframe, orient=VERTICAL, command=lfd.yview)
