@@ -52,7 +52,7 @@ tStyle = ttk.Style()
 #tStyle.configure('TNotebook')
 tStyle.configure('Bold.TNotebook.Tab', font='bold', padding=[20,0], background='#AAA')
 book['style'] = 'Bold.TNotebook'
-book.grid(column=0, row=2, columnspan=4, sticky='WN', padx=10, pady=20)
+book.grid(column=0, row=2, columnspan=4, sticky='NESW', padx=10, pady=20)
 inpframe = ttk.Frame(book, relief='raised')
 outframe = ttk.Frame(book, relief='raised')
 resframe = ttk.Frame(book, relief='raised')
