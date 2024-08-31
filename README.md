@@ -1,5 +1,6 @@
 This branch is still under development. The new software is fairly stable but the documentation is still in flux.
 Major updates:
+- early support for AAPS 3.3-dev
 - include the AAPS 3.2.0.4 capabilities
 - include the autoISF3.0.1 capabilities
 
@@ -26,3 +27,6 @@ Related data like SGV, target, Autosens ratio etc. are also shown.
 A special output is the flowchart which helps to understand the logic flow through the loop. This is the 
 track which statements in "determineSMB-basal" were executed and which not together with the reasoning 
 of those decisions taken from the original code.
+
+# Limitation
+Currently there is no solution to run the emulator on phones with Android14.
