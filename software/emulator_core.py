@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-06-05 23:50'
+    echo_msg['emulator_core.py'] = '2024-08-11 19:53'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -400,8 +400,7 @@ def setVariant(stmp):
                 myVal   = zeile[:woEndVal]
             if myVal != '':
                 while myVal[-1] == ' ' :    myVal = myVal[:-1]                      # truncate trailing BLANKS
-            #print(zeile, '['+myArray+'], ['+myItem+'], ['+myVal+']')
-           
+            
             woSTAIR = myVal.find('STAIR_')
             if woSTAIR >= 0:                                                        # get value from last valid step
                 if   myVal[woSTAIR+6:woSTAIR+9] == 'BAS':    myVal = STAIR_scan(stmp, myVal, woSTAIR, 3, STAIR_BAS)
@@ -613,19 +612,29 @@ def setVariant(stmp):
 
 def getOrigPred(predBGs):
     Fcasts = {}
-    for BGs in predBGs:
-        Fcasts[BGs] = predBGs[BGs]
+    #for BGs in predBGs:
+    #    Fcasts[BGs] = predBGs[BGs]
     #print ('orig preds --> '+str(Fcasts))
     return Fcasts
 
-def TreatLoop33(st, log, lcount, fn):
-    if not newLoop: return
-    key = 'resultJson='
+def extractResultComponent(st, key, keyStart, keyEnd):
     wo = st.find(key)
-    Curly= hole(st, 1+wo, '{', '}')
+    Curly= hole(st, 1+wo, keyStart, keyEnd)
     wo_apo = Curly.find("\'")
     if wo_apo>0:
         Curly = Curly[:wo_apo-1]+Curly[wo_apo:]
+    return Curly
+   
+def TreatLoop33(st, log, lcount, fn):
+    if not newLoop: return
+    global utcOffset
+    utcOffset = extractResultComponent(st, 'utcOffset', '=', ',')
+    get_currenttemp(  lcount, extractResultComponent(st, 'currentTempJson', '{', '}'))
+    get_iob_data(     lcount, extractResultComponent(st, 'iobDataJson', '[', ']'), log, st[:8] )
+    get_profile(      lcount, extractResultComponent(st, 'profileJson', '{', '}'))
+    get_autosens_data(lcount, extractResultComponent(st, 'autosensDataJson', '{', '}'))
+    get_meal_data(    lcount, extractResultComponent(st, 'mealDataJson', '{', '}'))
+    Curly = extractResultComponent(st, 'resultJson', '{', '}')
     rt = json.loads(Curly)
     global SMBreason, origAI_ratio
     SMBreason = {}                                              # clear for first filtered debug list
@@ -748,7 +757,8 @@ def TreatLoop(Curly, log, lcount, fn):
         if 'insulinReq' in suggest:
             key = 'insulinReq'
             ins_Req = suggest[key]
-            #log.write('  ' + (key+'    ')[:6] + '=' + str(insReq) + '\n')
+            #if str(ins_Req) == 'None':      ins_Req = 0
+            #print('\n\n  ' + (key+'    ')[:6] + '=' + str(ins_Req) + '\n\n')
             if ins_Req > 0.0:                            # can be empty string; was >0.2 before
                 mySMB  = getReason(reason, 'Microbolusing', 'U',  1)
                 maxBol = getReason(reason, 'maxBolus',      '. ', 1)
@@ -800,7 +810,7 @@ def TreatLoop(Curly, log, lcount, fn):
             origcob.append(round(suggest['COB'], 1))
             #log.write('  COB   =' + str(cob) + '\n')
             #iob.append(round(suggest['IOB']*10, 1))    # done in iob-data
-            Fcasts = getOrigPred(suggest['predBGs'])
+        Fcasts = getOrigPred(suggest['predBGs'])
         last_temp['date']   = thisTime - SMBreason['lastTempAge'] *60*1000  # copy from original logfile
         last_temp['rate']   = currenttemp['rate']
         last_temp['duration'] = currenttemp['duration']
@@ -831,13 +841,31 @@ def TreatLoop(Curly, log, lcount, fn):
         avgDelta.append(round(avg05, 2))
         if delta05<100 or True:                         # no risk of singularity, get linear regression; restriction not needed?
             dura70, slope70, slopes, iMax = getSlopeBG(len(bg)-1)
-            glucose_status['dura70'] = dura70
-            glucose_status['slope70'] = slope70
+            #print('\n')
+            for ele in slopes:
+                a0 = slopes[ele]['a0']
+                a1 = slopes[ele]['a1']
+                #tx = time.strptime(stmp[11:19], '%H:%M:%S') - time.strptime('00:00:00', '%H:%M:%S')    #bgTime[-1]     # bgTime[bgFrame]    # no forecast: +5*60
+                #t1 = tx
+                #t2 = tx - 1/(slopes[ele]['dur'])    # *60 #bgTime[bgFrame]
+                bg1= a0 + a1* 0/300
+                bg2= a0 - a1* slopes[ele]['dur']*60/300
+                #print(stmp[11:19], ele, str(slopes[ele]), str(slopes[ele]['dur']/3600/24), str(bg1), str(bg2))
+                
+            glucose_status['lin_fit_minutes'] = dura70
+            glucose_status['lin_fit_a1'] = slope70
+            if iMax == -1:
+                glucose_status['lin_fit_correlation'] = 0
+            else:
+                #if iMax == 635:
+                #    print (stmp, str(slopes))
+                glucose_status['lin_fit_correlation'] = slopes[iMax]['corr']
             longSlope.append(round(dura70, 2))
             rateSlope.append(round(slope70, 2))
             glucose_status['delta05'] = getDeltaBG(slopes, 7.5)
             glucose_status['delta15'] = getDeltaBG(slopes,17.5)
             glucose_status['delta40'] = getDeltaBG(slopes,42.5)
+            #
             #print(stmp, str(glucose_status))
             pass
         else:
@@ -1040,31 +1068,44 @@ def get_glucose_status(lcount, st) :                    # key = 80
 
 def get_iob_data(lcount, st, log, stampStr) :                     # key = 81
     if not newLoop: return
-    if not isZip:
-        st = st[:-1]                               # drop the <CRLF>
     global iob_data, utcOffset
     global activity
-    key = 'IobTotal'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
-    else:
-        Curly = st[16:]
-    #print('\nvorher: ', Curly[:165])
-    if Curly[0]=='(':       # Milos new non-json format
-        Curly = ' ' + Curly[1:-1].replace('=', '":')
-        Curly = Curly.replace('), ', '},"')
-        Curly = Curly.replace(' ', '"')
-        Curly = Curly.replace('IobTotal', '')
-        Curly = Curly.replace('(', '{"')
-        Curly = Curly.replace('duraISFaverage', 'dura_ISF_average')
-        Curly = Curly.replace('parabolaMinutes', 'parabola_fit_minutes')
-        Curly = Curly.replace('deltaPl', 'parabola_fit_last_delta')
-        Curly = Curly.replace('deltaPn', 'parabola_fit_next_delta')
-        Curly = Curly.replace('"{', '{')
-        Curly = '[{' + Curly + '}]'
-        #print('nachher:', Curly[:170])
-        #print('400-420:/'+ Curly[:420] +'/')
+    global AAPS_Version
+    if AAPS_Version != '3.3' and st.find('netbasalinsulin')>0:
+        AAPS_Version = '3.3'    # missed other sings
+        return                  # wait for DATABASE RECORD
+    if AAPS_Version == '3.3':     
+        Curly = st
+    else:        
+        key = 'CurrentTemp'
+        wo = st.find(key)
+        if wo>0:        # APS3.3-dev format
+            Curly= st[wo+len(key):]
+        else:
+            Curly = st[16:]
+        if not isZip:
+            st = st[:-1]                               # drop the <CRLF>
+        key = 'IobTotal'
+        wo = st.find(key)
+        if wo>0:        # older APS3.3-dev format
+            Curly= st[wo+len(key):]
+        else:
+            Curly = st[16:]
+        #print('\nvorher: ', Curly[:165])
+        if Curly[0]=='(':       # Milos new non-json format
+            Curly = ' ' + Curly[1:-1].replace('=', '":')
+            Curly = Curly.replace('), ', '},"')
+            Curly = Curly.replace(' ', '"')
+            Curly = Curly.replace('IobTotal', '')
+            Curly = Curly.replace('(', '{"')
+            #Curly = Curly.replace('duraISFaverage', 'dura_ISF_average')
+            #Curly = Curly.replace('parabolaMinutes', 'parabola_fit_minutes')
+            #Curly = Curly.replace('deltaPl', 'parabola_fit_last_delta')
+            #Curly = Curly.replace('deltaPn', 'parabola_fit_next_delta')
+            Curly = Curly.replace('"{', '{')
+            Curly = '[{' + Curly + '}]'
+            #print('nachher:', Curly[:170])
+            #print('400-420:/'+ Curly[:420] +'/')
     iob_array = json.loads(Curly)
     iob_data = {}
     iob_data['typeof']  = 'dummy'                       # may be anything
@@ -1087,14 +1128,16 @@ def get_iob_data(lcount, st, log, stampStr) :                     # key = 81
             else:
                 activity[-1] = (act*1000)
         elif ele == 'time':
-            #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr)
-            hourOffset = eval('1' + stampStr[0:2]+ '-1' + rec_0[ele][11:13])
-            minuteOffset = eval('1' + stampStr[3:5] + '-1' + rec_0[ele][14:16])
-            utcOffset = round(hourOffset + minuteOffset/60, 0)
-            if   utcOffset >13:     utcOffset -= 24
-            elif utcOffset<-12:     utcOffset += 24
-            #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr, ' UTC offset: '+str(utcOffset))
-            #print('in get_iob_data', str(type('utcOffset')))
+            if AAPS_Version != '3.3':
+                #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr)
+                hourOffset = eval('1' + stampStr[0:2]+ '-1' + rec_0[ele][11:13])
+                minuteOffset = eval('1' + stampStr[3:5] + '-1' + rec_0[ele][14:16])
+                utcOffset = round(hourOffset + minuteOffset/60, 0)
+                if   utcOffset >13:     utcOffset -= 24
+                elif utcOffset<-12:     utcOffset += 24
+                #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr, ' UTC offset: '+str(utcOffset))
+                #print('in get_iob_data', str(type('utcOffset')))
+                pass
     iob_data['iobArray']= iob_array
     iob_data['utcOffset'] = utcOffset
     #print ('preliminary iob data json -->       '+str(lcount) +' : '+ str(iob_data))
@@ -1105,12 +1148,15 @@ def get_iob_data(lcount, st, log, stampStr) :                     # key = 81
 
 def get_currenttemp(lcount, st) :                       # key = 82
     if not newLoop: return
-    key = 'CurrentTemp'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
-    else:
-        Curly = st[16:]
+    if AAPS_Version == '3.3':  
+        Curly = st
+    else:        
+        key = 'CurrentTemp'
+        wo = st.find(key)
+        if wo>0:        # APS3.3-dev format
+            Curly= st[wo+len(key):]
+        else:
+            Curly = st[16:]
     global currenttemp
     #print('vorher: ', Curly)
     if Curly[0]=='(':       # Milos new non-json format
@@ -1130,13 +1176,16 @@ def get_currenttemp(lcount, st) :                       # key = 82
     pass
 
 def get_profile(lcount, st) :                           # key = 83
-    if not newLoop: return
-    key = 'OapsProfileAutoIsf'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
+    if not newLoop : return
+    if AAPS_Version == '3.3':
+        Curly = st
     else:
-        Curly = st[16:]
+        key = 'OapsProfileAutoIsf'
+        wo = st.find(key)
+        if wo>0:        # APS3.3-dev format
+            Curly= st[wo+len(key):]
+        else:
+            Curly = st[16:]
     global profile, profISF
     global origTarLow, origTarHig, emulTarLow, emulTarHig
     #print('\nvorher: ', Curly)
@@ -1150,7 +1199,7 @@ def get_profile(lcount, st) :                           # key = 83
         Curly = Curly.replace('dl,"lgsThreshold', 'dl","lgsThreshold')
         Curly = '{' + Curly + '}'
         #print('\nnachher:', Curly)
-        #print('char 959:', Curly[950:965])  #, str(chr(Curly[948])))
+        #print('char 5:', Curly[.10])  #, str(chr(Curly[948])))
     profile = json.loads(Curly)
     #profile['maxDeltaRatio'] = 0.2                     ### moved to new_parameter: additional parameter; define standard
     profile['row'] = lcount
@@ -1177,12 +1226,15 @@ def get_profile(lcount, st) :                           # key = 83
 
 def get_meal_data(lcount, st) :                         # key = 84
     if not newLoop: return
-    key = 'MealData'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
+    if AAPS_Version == '3.3':     
+        Curly = st
     else:
-        Curly = st[16:]
+        key = 'MealData'
+        wo = st.find(key)
+        if wo>0:        # APS3.3-dev format
+            Curly= st[wo+len(key):]
+        else:
+            Curly = st[16:]
     global meal_data
     #print('vorher: ', Curly)
     if Curly[0]=='(':       # Milos new non-json format
@@ -1196,6 +1248,10 @@ def get_meal_data(lcount, st) :                         # key = 84
     # use fixed settings for the time being ...
     meal_data['bwCarbs'] = False                        # bolus wizzard carbs
     meal_data['bwFound'] = False                        # bolus wizzard used ?
+    if 'mealCOB' not in meal_data:                      meal_data['mealCOB'] = 0
+    if 'carbs' not in meal_data:                        meal_data['carbs'] = 0
+    if 'slopeFromMinDeviation' not in meal_data:        meal_data['slopeFromMinDeviation'] = 999
+    if 'slopeFromMaxDeviation' not in meal_data:        meal_data['slopeFromMaxDeviation'] = 0
     #print ('meal data json -->      '+str(meal_data))
     pass
 
@@ -1212,12 +1268,15 @@ def get_autoISF_extras(lcount, Curly):
 
 def get_autosens_data(lcount, st) :                     # key = 86
     if not newLoop: return
-    key = 'AutosensResult'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
+    if AAPS_Version == '3.3':     
+        Curly = st
     else:
-        Curly = st[16:]
+        key = 'AutosensResult'
+        wo = st.find(key)
+        if wo>0:        # APS3.3-dev format
+            Curly= st[wo+len(key):]
+        else:
+            Curly = st[16:]
     global autosens_data, profile
     global origAs_ratio, autoISF
     #print('zeile:'+str(lcount),' vorher:\n', Curly)
@@ -1238,6 +1297,7 @@ def get_autosens_data(lcount, st) :                     # key = 86
         autosens_data = json.loads(Curly)
     autosens_data['typeof'] = 'dummy'                   # may be anything
     autosens_data['row'] = lcount
+    if 'ratio' not in autosens_data:            autosens_data['ratio'] = 1.0
     if len(origAs_ratio) ==len(loop_mills) :
         origAs_ratio.append(autosens_data['ratio']*10)
         autoISF.append(profile['sens'] / autosens_data['ratio'])    # ISF assigned now as autoense is the last data block
@@ -1435,14 +1495,15 @@ def scanLogfile(fn, entries):
                             #elif dataType != 163:   print('unhandled dataType:', str(dataType), 'row', str(lcount), 'of file',fn) # any but 2.7 RESULT
                             #version_set = True                              # keep until next logfile is loaded
                             pass
-                        #elif Block2[:-4] == '[DetermineBasalAdapterSMBJS.invoke():':  # various input items for loop
+                        if Block2.find('AutoISF')>0:                         AAPS_Version = '3.3'    # during dev only?
+                        #print('AAPS versoin:', AAPS_Version, '   found:', dataTxt)
                         if   dataTxt[:16] == 'RhinoException: ' :           code_error(lcount, dataStr)
                         elif dataTxt[:16] == 'Glucose status: ' :           get_glucose_status(lcount, dataStr)
-                        elif dataTxt[:16] == 'IOB data:       ' :           get_iob_data(lcount, dataStr, log, zeile[:8])
-                        elif dataTxt[:16] == 'Current temp:   ' :           get_currenttemp(lcount, dataStr)
-                        elif dataTxt[:16] == 'Profile:        ' :           get_profile(lcount, dataStr)
-                        elif dataTxt[:16] == 'Meal data:      ' :           get_meal_data(lcount, dataStr)
-                        elif dataTxt[:16] == 'Autosens data:  ' :           get_autosens_data(lcount, dataStr)
+                        elif dataTxt[:16] == 'IOB data:       ' and AAPS_Version!='3.3':     get_iob_data(lcount, dataStr, log, zeile[:8])
+                        elif dataTxt[:16] == 'Current temp:   ' and AAPS_Version!='3.3':     get_currenttemp(lcount, dataStr)
+                        elif dataTxt[:16] == 'Profile:        ' and AAPS_Version!='3.3':     get_profile(lcount, dataStr)
+                        elif dataTxt[:16] == 'Meal data:      ' and AAPS_Version!='3.3':     get_meal_data(lcount, dataStr)
+                        elif dataTxt[:16] == 'Autosens data:  ' and AAPS_Version!='3.3':     get_autosens_data(lcount, dataStr)
                         elif dataTxt      == 'AutoIsfMode:     ' :          get_AutoIsfMode(lcount, dataStr)
                         elif dataTxt      == 'flatBGsDetected: ' :          get_flatBGsDetected(lcount, dataStr)
                         elif dataTxt      == 'MicroBolusAllowed' :          get_MicroBolusAllowed(lcount, dataStr)
@@ -1585,59 +1646,70 @@ def getDeltaBG(slopes, duration):
                 use = i+1                   # use last value before
             else:
                 use = i                     # only one entry, use it
-            slop = slopes[use]['b'] * 5*60  # BG increment per 5 minutes
+            slop = slopes[use]['a1'] * 5*60 # BG increment per 5 minutes
             return round(slop, 2)
     if len(slopes)>0:
-        slop = slopes[i]['b'] * 5*60        # BG increment per 5 minutes
+        slop = slopes[i]['a1'] * 5*60       # BG increment per 5 minutes
         return round(slop, 2)               # use last fit from record i
     else:
         return 0                            # e.g. less than 3 BG values; same as in GlucoseStatus.java
 
 def getSlopeBG(iFrame):
     # linerar regression analysis after 
-    # http://www.carl-engler-schule.de/culm/culm/culm2/th_messdaten/mdv2/auszug_ausgleichsgerade.pdf
+    # https://goodcalculators.com/linear-regression-calculator/ wie von der Parabel
+    #bgTime = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] # test data for x
+    #bg= [-3.624, -2.783, 4.299, 4.041, 9.759, 5.013, 10.187, 5.475, 6.46, 11.307] # test data for y=a + x*b
     if iFrame < 2:         return 0,0, {}, -1   # first 2 points make a trivial line
 
-    corrMin = 0.70                          # go backwards until the correlation coefficient goes below
+    corrMin = 0.85                          # skip correlation coefficient below
+    corrMax = 0.0
     sumBG   = 0                             # y
     sumt    = 0                             # x
     sumBG2  = 0                             # y^2
     sumt2   = 0                             # x^2
     sumxy   = 0                             # x*y-axis
     slopes  = {}
-    #t = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] # test data for x
-    #bg= [2, 1, 3, 3, 5, 4, 7, 5, 6, 6,  8] # test data for y=a + x*b
-    corrMax = 0
+    scaleTime =   1                         # in sec; values are 0, 300, 600, 900, 1200, ... while testing
+    scaleTime = 300                         # in 5m; values are  0,   1,   2,   3,    4, ...
+    scaleBg   =   1                         # TIR range is now  70 - 180                 ... while testing
+    scaleBg   =  50                         # TIR range is now 1.4 - 3.6
+
     for i in range(iFrame, -1, -1):
-        sumt    += bgTime[i]
-        sumt2   += pow(bgTime[i], 2)
-        sumBG   += bg[i]
-        sumBG2  += pow(bg[i], 2)
-        sumxy   += bgTime[i] * bg[i]
+        ti       = (bgTime[i] -bgTime[iFrame])/scaleTime      # time offset to make the numbers smaller for numerical accuracy
+        bgi      = bg[i]/scaleBg
+        sumt    += ti
+        sumt2   += pow(ti, 2)
+        sumBG   += bgi
+        sumBG2  += pow(bgi, 2)
+        sumxy   += ti * bgi
         n = iFrame - i + 1
+        #print(str(sumt), str(sumt2), str(sumBG), str(sumBG2), str(sumxy))
         dividend = n*sumxy - sumt*sumBG
-        if (n*sumt2 - pow(sumt,2)) * (n*sumBG2 - pow(sumBG,2)) != 0:    # otherwise DIV ZERO in r_sq
-            r_sq    = pow(dividend,2) / abs( (n*sumt2 - pow(sumt,2)) * (n*sumBG2 - pow(sumBG,2)) )
-            dur     =(bgTime[iFrame]-bgTime[i])/60
-            if r_sq < corrMin and dur>42.5:      break  # correlation too bad
+        divisor  = (n*sumt2 - pow(sumt,2)) * (n*sumBG2 - pow(sumBG,2))
+        if divisor != 0:    # otherwise DIV ZERO in r_sq
+            r_sq    = pow(dividend,2) / abs(divisor)
+            dur     = -ti*scaleTime/60    #(bgTime[iFrame]-bgTime[i])/60
+            if r_sq < corrMin or dur>120:      break  # correlation deteriorating and window too long
 
             b       = dividend / (n*sumt2 - pow(sumt,2))
-            a       = ( sumBG - b*sumt) / n
+            a       = ( sumBG - b*sumt) / n 
             if i<iFrame-1:      
-                slopePar = dict(n=n-1, a=a, b=b, corr=r_sq, dur=dur)
+                if r_sq>=corrMin:
+                    slopePar = dict(n=n-1, a0=a*scaleBg, a1=b*scaleBg, corr=r_sq, dur=dur)
+                    slopes[i] = slopePar
                 if r_sq>corrMax:
                     corrMax = r_sq
                     iMax = i
-                    dura70  = ( bgTime[iFrame] - bgTime[i] ) / 60
-                    slope70 = b * 5 * 60       # 5 minute slope at best correlation
-                slopes[i] = slopePar
-            #print ('some fit', str(n-1), str(b), str(a),str(r_sq))
+                    dura70  = dur                       #( bgTime[iFrame] - bgTime[i] ) / 60
+                    slope70 = b * scaleBg               # 5 minute slope at best correlation
+            #print ('some fit', str(n-1), str(b* scaleBg), str(a* scaleBg), str((a-b)* scaleBg), str(r_sq))
+            pass
     if corrMax == 0:         return 0,0, slopes, -1   # no good correlation found
     #print('found these deltas')
     #for i in slopes:    print(str(i), str(slopes[i]))
     #print('selected deltas are', str(getDeltaBG(slopes,7.5)), str(getDeltaBG(slopes,17.5)), str(getDeltaBG(slopes,42.5)))
     return round(dura70,0), round(slope70,1), slopes, iMax
-    
+
 def getBestParabolaBG(iFrame):
 ## nach https://goodcalculators.com/quadratic-regression-calculator/
 ##  und zur Eingabe von Beispieldaten
@@ -1738,7 +1810,7 @@ def getBestParabolaBG(iFrame):
     #for i in parabs:    print(str(i), str(parabs[i]))
     #print('selected parabola', str(iMax), 'has forecast', str(dura_p), str(round(delta_p,1)))
     return dura_p, delta_p, parabs, iMax
-    
+
 def populateColumn(tLast, array, weight, iFirst, loopCount):
     # e.g.  tLast = f'target      {emulTarHig[iLast]:>6}'
     for col in range(loopCount-2, iFirst, -1) :
@@ -1762,7 +1834,7 @@ def getBgTimeIndex(iFrame):
     #for bgFrame in bgTime
     #print(' bgIndex is: '+str(bgIndex), ' bgTime is: '+str(bgTime[bgIndex]), str(ele))
     return bgIndex
-    
+
 def XYplots(loopCount, head1, head2, entries) :
     import matplotlib.pyplot as plt
     from matplotlib.animation import FFMpegWriter
@@ -1969,24 +2041,33 @@ def XYplots(loopCount, head1, head2, entries) :
                         if iFrame>1 and ( featured('fitsslope') or featured('bestslope')):  # show all fits
                             dura70, slope70, slopes, iMax = getSlopeBG(bgFrame)
                             first_linear_fit = True
+                            keepMax = -1
                             for i in slopes:
                                 #print ('iFrame', str(iFrame), ' mit', str(i), 'hat', str(slopes[i]))
-                                a = slopes[i]['a']
-                                b = slopes[i]['b']
-                                t1= bgTime[i]
-                                t2= bgTime[bgFrame]
-                                b1= b*t1+a
-                                b2= b*t2+a
-                                fitcolor = ['#c0c0c0',  'black']                            # grey, black
+                                a0 = slopes[i]['a0']
+                                a1 = slopes[i]['a1']
+                                tx = bgTime[bgFrame]    # no forecast: +5*60
+                                t1 = tx
+                                t2 = tx - slopes[i]['dur']*60 #bgTime[bgFrame]
+                                bg1= a0 + a1* 0/300
+                                bg2= a0 - a1* slopes[i]['dur']*60/300
+                                fitcolor = ['#a0a0a0',  'black']                            # dark grey, black
                                 isBest = ( i==iMax)
                                 if not isBest and featured('fitsslope'):
                                     if first_linear_fit:
-                                        axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='any linear fit')#all the fits
+                                        axbg.plot([bg1,bg2], [t1,t2], linestyle='dotted', marker='*', color='#a0a0a0', label='any linear fit')#all the fits
                                         first_linear_fit = False
                                     else:
-                                        axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest])                     #all the fits
+                                        axbg.plot([bg1,bg2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest])                     #all the fits
                                 if isBest and featured('bestslope'):
-                                    axbg.plot([b1,b2], [t1,t2], linestyle='dotted', marker='*', color=fitcolor[isBest], label='best linear fit')   #best fit
+                                    keepMax = iMax
+                                    #print(str(a0), str(a1), str(slopes[i]['dur']*60), str(bg1)+'/'+str(t1), str(bg2)+'/'+str(t2))
+                                    best_bg1 = bg1
+                                    best_bg2 = bg2
+                                    best_t1 = t1
+                                    best_t2 = t2
+                            if keepMax>=0:
+                                axbg.plot([best_bg1,best_bg2], [best_t1,best_t2], linestyle='dotted', marker='*', color='black', label='best linear fit')   #best fit
                         if iFrame>2 and (featured('bestParabola') or featured('fitsParabola')): # show parabolas
                             dura_p, delta_p, parabs, iMax = getBestParabolaBG(bgFrame)
                             first_parabola_fit = True
@@ -2001,9 +2082,6 @@ def XYplots(loopCount, head1, head2, entries) :
                                 fitcolor = ['#ff00ff',  '#900090']                          # faint violett = magenta, dark violett
                                 isBest = ( i==iMax)
                                 tx = bgTime[bgFrame] +5*60                                   # window end time = +5min from last glucose
-                                #if a2 != 0:
-                                #    tminmax = -a1/(2*a2)+5*60                               # time of min or max +5min
-                                #    tx = max(tx, tminmax)                                   # if min/max is ahead of bgTime
                                 while tx >= bgTime[bgFrame]-dur*60:
                                     ti = (tx - bgTime[bgFrame])/300
                                     bfit.append(a2*pow(ti,2) + a1*ti + a0)
@@ -2019,6 +2097,7 @@ def XYplots(loopCount, head1, head2, entries) :
                                         axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest])     # some other Parabola
                                     axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest])     # some other Parabola
                                 if isBest and featured('bestParabola'):
+                                    #print('p-tfit:', str(tfit), '\np-bfit', str(bfit))
                                     axbg.plot(bfit, tfit, linestyle='dotted', color=fitcolor[isBest])    #  best Parabola
                                     axbg.plot([bfit[ 0],bfit[ 0]], [tfit[ 0],tfit[ 0]], marker='o', color=fitcolor[isBest], label='best parabola fit') #  bulls eye of newest forecast
                                     axbg.plot([bfit[-1],bfit[-1]], [tfit[-1],tfit[-1]], marker='o', color=fitcolor[isBest]) #  bulls eye of oldest forecast
@@ -2027,20 +2106,16 @@ def XYplots(loopCount, head1, head2, entries) :
                         axbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='Autosense(x10) OFF')
                         axbg.plot(origAs_ratio,loop_mills,linestyle='solid',  marker='.',   color='black',label='Autosense(x10), original')
                         axbg.plot(emulAs_ratio,loop_mills,linestyle='none',   marker='o',   color='black',label='Autosense(x10), emulated')
-
                     if featured('autoISF') :                                                # plot autoISF ratio on top of darker autosense
                         #xbg.plot([10,10],[loop_mills[0],loop_mills[-1]],linestyle='dotted',color='black',label='AutoISF(x10) OFF')
                         axbg.plot(emulAI_ratio,loop_mills,linestyle='none',   marker='o',   color='#606060', label='AutoISF(x10), emulated')
                         axbg.plot(origAI_ratio,loop_mills,linestyle='solid',  marker='.',   color='#C0C0C0', label='AutoISF(x10), original')
-
                     if featured('ISF') :                                                    # plot ISF
                         axbg.plot(emulISF,loop_mills,linestyle='none',   marker='o',    color='#007000',label='ISF, emulated')
                         axbg.plot(autoISF,loop_mills,linestyle='dashed', marker='.',    color='#009000',label='ISF, autosensed')
                         axbg.plot(origISF,loop_mills,linestyle='dotted', marker='.',    color='#00FF00',label='ISF, original')
-
                     if featured('activity') :                                               # plot activity
                         axbg.plot(activity, loop_mills, linestyle='solid',              color='yellow', label='Activity(x1000)')
-
                     if featured('iob') :                                                    # plot IOB
                         axbg.plot(origiob,  loop_mills, linestyle='solid',              color='blue',   label='IOB(x10)')
                         axbg.fill(iob_area, looparea, c='blue',   alpha=0.2)
@@ -2057,19 +2132,18 @@ def XYplots(loopCount, head1, head2, entries) :
                     if featured('cob') :                                                    # plot COB
                         axbg.plot(origcob,  loop_mills, linestyle='solid',              color='orange', label='COB')
                         axbg.fill(cob_area, looparea, c='orange', alpha=0.4)
-
                     if featured('pred') :                                                   # plot the predictions
                         thisTime = loop_mills[iFrame]
                         loopCount = 48+1
                         fcastmills = []
                         for lp in range(loopCount):
                             fcastmills.append(round(thisTime/1.000 + lp*5*60, 1 ))          # from millis to secs
-                        bbox_props = dict(boxstyle='larrow', fc='grey', alpha=0.7)          # slider with time label
+                        bbox_props = dict(boxstyle='larrow', fc='#f0f0f0', alpha=0.7)       # slider with time label
                         axbg.set_ylim(loop_mills[0]+thickness*2+yRange*1.1, loop_mills[0]-thickness*2)    # add thickness*2 so markers fit into plot frame + 10% space for BG labels
                         axbg.set_xlim(0,250)                                                # otherwise we need to find scale over all time steps
                         bg_min, bg_max = axbg.get_xlim()
                         axbg.text(bg_min+3, fcastmills[0], loop_label[iFrame], va='center', size=8, bbox=bbox_props)
-                        axbg.fill_between([bg_min,bg_max], fcastmills[0]-2*thickness, fcastmills[-1]+2*thickness, fc='grey', alpha=0.6)  # time window
+                        axbg.fill_between([bg_min,bg_max], fcastmills[0]-2*thickness, fcastmills[-1]+2*thickness, fc='#e0e0e0', alpha=0.6)  # time window
                         if frameIns:
                             in_min, in_max = axin.get_xlim()
                             axin.plot([in_min,in_max], [fcastmills[0],fcastmills[0]], linestyle='dotted', color='grey', lw=0.5)          # time line
@@ -2078,6 +2152,8 @@ def XYplots(loopCount, head1, head2, entries) :
                         Levels = Fcasts['Levels']
 
                         #print (str(loop_label[iFrame]), str(Levels))
+                        #for ele in Fcasts:
+                        #    print (ele)
                         if 'minPredBG'    in Levels:
                             BGValPlot(axbg,-1, 'minPredBG',    Levels['minPredBG'],    fcastmills[-1], colFav['bg'])
                         if 'minZTGuardBG' in Levels:
@@ -2261,7 +2337,7 @@ def XYplots(loopCount, head1, head2, entries) :
         #pdf.close()                                        # not needed due to "with ..." method triggered above
     pass
 
-def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries, msg, my_dec):    
+def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries, msg, my_dec):
     #log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile+'\nstartLabel='+startLabel+'\nstoppLabel='+stoppLabel)
     #   start of top level analysis
     
@@ -2860,7 +2936,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if loopCount>1:
             loopInterval = (loop_mills[-1] - loop_mills[0]) / (loopCount-1) / 1000     # avg. sec per loop
         return loopInterval, loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
-    
+
 def set_tty(printframe, txtbox, channel):                   # for GIU
     global how_to_print
     how_to_print = channel
@@ -2868,7 +2944,7 @@ def set_tty(printframe, txtbox, channel):                   # for GIU
     runframe = printframe
     global lfd
     lfd = txtbox
-    
+
 def log_msg(msg, eol='\n'):                                 # for GUI
     if how_to_print == 'GUI':
         lfd['state'] = 'normal'
@@ -2881,7 +2957,7 @@ def log_msg(msg, eol='\n'):                                 # for GUI
         lfd['state'] = 'disabled'
         runframe.update()                                   # update frame display
     else:
-        print(msg, end=eol)
+        print(msg, eol)
 
 def sub_issue(msg):
     if how_to_print == 'GUI':

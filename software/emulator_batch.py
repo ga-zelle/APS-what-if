@@ -12,7 +12,7 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2024-05-24 17:55'
+    echo_msg['emulator_batch.py'] = '2024-05-24 23:25'
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
