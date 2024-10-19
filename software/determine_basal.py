@@ -926,6 +926,9 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     
     if ('activity' not in iob_data or 'iob' not in iob_data ):
         rT['error'] ='Error: iob_data missing some property. '
+        print(str(iob_data))
+        for ele in iob_data:
+            print('found element', ele)
         return rT
 
     #tick;

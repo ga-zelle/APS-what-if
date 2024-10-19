@@ -1111,6 +1111,9 @@ def get_iob_data(lcount, st, log, stampStr) :                     # key = 81
     iob_data['typeof']  = 'dummy'                       # may be anything
     # get first record as current iob
     rec_0 = iob_array[0]
+    if 'iob' not in rec_0:                  rec_0['iob'] = 0.0
+    if 'activity' not in rec_0:             rec_0['activity'] = 0.0
+    if 'lastBolusTime' not in rec_0:        rec_0['lastBolusTime'] = 0
     for ele in rec_0 :
         if ele != 'iobWithZeroTemp':        iob_data[ele] = rec_0[ele]
         if ele == 'iob':
@@ -1176,6 +1179,7 @@ def get_currenttemp(lcount, st) :                       # key = 82
     pass
 
 def get_profile(lcount, st) :                           # key = 83
+    global newLoop
     if not newLoop : return
     if AAPS_Version == '3.3':
         Curly = st
@@ -1220,8 +1224,8 @@ def get_profile(lcount, st) :                           # key = 83
         emulTarHig[-1] = origTarHig[-1]
         profISF[-1]    = profile['sens']
     #print ('master profile json in row '+str(lcount)+' --> '+str(profile))
-    #print ('target data found in row '+str(lcount)+', total count origTarLow='+str(len(origTarLow)))
-    #print ('target data found in row '+str(lcount)+', total count emulTarLow='+str(len(origTarLow)))
+    #print ('target data found in row '+str(lcount)+', total count loop/origTarLow='+str(len(loop_mills))+'/'+str(len(origTarLow)))
+    #print ('target data', str(origTarLow), 'found in row '+str(lcount)+', total count emulTarLow='+str(len(origTarLow)))
     pass
 
 def get_meal_data(lcount, st) :                         # key = 84
@@ -2566,6 +2570,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     varlog.write('END\n')
     varlog.close()
     
+    #print(str(loopCount),'\n', str(origTarLow), '\n', str(origTarHig))    
     if loopCount > 0 :   # ---   save the results from current logfile   --------------
         for iFrame in range(len(loop_label)):
             thisTime = loop_mills[iFrame]
@@ -2582,6 +2587,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                         strBZ = str(round(thisBZ, 1))                      # mmol
                     r_list += f'{strBZ:>6}'
                 if featured('target'):
+
                     r_list += f'{round((origTarLow[iFrame] + origTarHig[iFrame])/2,0):>8}'.replace(".0","")
                 if featured('iob'):     
                     r_list += f'{round(origiob[iFrame]/10,2):>6}{round(emuliobTH[iFrame]/10,2):>6}'   # scaled up for plotting
@@ -2957,7 +2963,7 @@ def log_msg(msg, eol='\n'):                                 # for GUI
         lfd['state'] = 'disabled'
         runframe.update()                                   # update frame display
     else:
-        print(msg, eol)
+        print(msg, end=eol)
 
 def sub_issue(msg):
     if how_to_print == 'GUI':
