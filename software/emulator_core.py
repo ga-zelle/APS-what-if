@@ -1351,8 +1351,10 @@ def ConvertSTRINGooDate(stmp) :
          dlst = 3600                                 #    dlst period summer 2023
     elif stmp < "2024-03-31T02:00:00.000Z":
          dlst =    0                                 # no dlst period winter 2023/24
-    else:
+    elif stmp < "2024-10-27T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2024
+    else:
+         dlst =    0                                 # no dlst period winter 2024/5
     MSJahr		= eval(    stmp[ 0:4])
     MSMonat		= eval('1'+stmp[ 5:7]) -100
     MSTag		= eval('1'+stmp[ 8:10])-100
