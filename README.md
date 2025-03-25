@@ -1,10 +1,11 @@
-This branch is still under development. The new software is fairly stable but the documentation is still in flux.
-Major updates:
-- early support for AAPS 3.3-dev
+This branch is close to final status. The new software is fairly stable but the documentation is not yet 
+updated. Major updates:
+- support for AAPS 3.3 versions
 - include the AAPS 3.2.0.4 capabilities
 - include the autoISF3.0.1 capabilities
+- include recent big fixes from AutoISF version 3.0.3
 
-This branch is not yet fully tested and may contain bugs. In such cases please contact ga-zelle.
+This branch is nit yet fully tested and may contain bugs. In such cases please contact ga-zelle.
 
 See also the change.log
 
@@ -29,4 +30,4 @@ track which statements in "determineSMB-basal" were executed and which not toget
 of those decisions taken from the original code.
 
 # Limitation
-Currently there is no solution to run the emulator on phones with Android14.
+There is an intermm release of python for Android-14 and above which seems to allow running the emulator on phones.
