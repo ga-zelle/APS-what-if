@@ -1,3 +1,15 @@
+25.Mar.2025
+===========
+Further adaptations for AAPS3.3.2 logfile format
+Included AutoISF bug fixes for
+- reporting iobTH settings
+- enabling resistance mode, i.e. sensitivity ratio from *low TT lowers sensitivity* is now the base and
+  AutoISF adaptations are applied on top. This is analogous to the exercise mode, just the opposite direction.
+
+A prototype python version is out for running the emulator on phones with Android-14 or higher. But this only
+works for the dedicated AutoISF version, not for standard or dev versions of AAPS3.3
+
+
 31.Aug.2024
 ===========
 Adapted to read the new AAPS3.3-dev logfile format. That format may change as long as 3.3 is in dev state.
