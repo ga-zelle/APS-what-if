@@ -12,7 +12,7 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2024-05-24 23:25'
+    echo_msg['emulator_batch.py'] = '2025-03-24 17:16'      # Hilfe gegen lispelndes Deutsch
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
@@ -60,6 +60,7 @@ def dialog1(Title, btns, default_btn, items, default_item):
             print(btn +'-' + btns[btn], trail)
         #print('default:', btns[default_btn] )
         my_opt = input('Enter key for option or action: ')
+        if ord((my_opt+default_btn)[0])>96:      my_opt = chr(ord(my_opt)-32)
         if my_opt in items:
             return default_btn, my_opt, False
         elif my_opt in btns:
@@ -91,8 +92,8 @@ def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss o
         if waitSec<10:
             waitSec = 60                        # was even negative sometimes
     then = datetime.now() + timedelta(seconds=waitSec)
-    thenStr = format(then, '%H:%M')
-    print ('\nWaiting ' + str(waitSec) + 'sec for next loop at '+ thenStr + ';   Variant "' + varName + '"')
+    thenStr = format(then, '%H:%M:%s')
+    print ('\nWaiting ' + str(waitSec) + 'sec for next loop at '+ thenStr[:8] + ';   Variant "' + varName + '"', end='\r')
     return waitSec
 
 def alarmHours(titel):
@@ -134,26 +135,43 @@ global echo_msg
 
 # try whether we are on Android:
 IsAndroid = False
-test_dir10= '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'    # always find it even when starting new logfile
 test_file = 'AndroidAPS.log'
+
+test_dir14= '/storage/emulated/0/Documents/AAPS/logs/'
+inh14     = glob.glob(test_dir14+'*')            # for Android11+ using AAPS 3.0+
+if len(inh14) > 0:
+    IsAndroid = True
+    test_dir = test_dir14
+    fn = test_dir + test_file
+    print('gefunden:', fn)
+    vdf_dir = test_dir[:-5]
+    
+test_dir10= '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'    # always find it even when starting new logfile
 inh10     = glob.glob(test_dir10+'*')            # for Android10 or less using AAPS 2.8.2
-if len(inh10) > 0:
+if not IsAndroid and len(inh10) > 0:
     IsAndroid = True
     test_dir = test_dir10
     fn = test_dir + test_file
+    print('gefunden:', fn)
+    vdf_dir = test_dir
 
 test_dir11= '/storage/emulated/0/AAPS/logs/info.nightscout.androidaps/'
 inh11     = glob.glob(test_dir11+'*')            # for Android11+ using AAPS 3.0+
-if len(inh11) > 0:
+if not IsAndroid and len(inh11) > 0:
     IsAndroid = True
     test_dir = test_dir11
     fn = test_dir + test_file
+    print('gefunden:', fn)
+    vdf_dir = test_dir
     
 if IsAndroid :
-    #import androidhelper
-    #droid=androidhelper.Android()
-    from androidhelper import Android
-    droid = Android()
+    import androidhelper
+    droid=androidhelper.Android()
+    #t from androidhelper import Android
+    #t droid = Android()
+    #from  subprocess import call
+    speed = '150'
+    pitch = '33'
     #ClearScreenCommand = 'clear'                                           # done in --core.py
     
     #inh = glob.glob(test_dir+'files/AndroidAPS.log')
@@ -164,15 +182,18 @@ if IsAndroid :
     #   the language dialog
     ###########################################################################
     btns  = {"N":"Next", "T":"Test", "E":"Exit"}
-    items = {"1":"Dieses Smartphone spricht Deutsch", "2":"This smartphone speaks English"}
+    items = {"1":"Dieses Smartphon spricht Deutsch", "2":"This smartphone speaks English"}
+    #global language
+    language = {"1":"de+f18", "2":"en+f18"}
     pick = "1"
     pressed_button = "N"
     while True:                                                             # how the lady speaks ...
         pressed_button, pick, done = dialog1('Languages', btns, pressed_button, items, pick)
         #pick = selected_items_indexes[0]
-        if done and pressed_button == "N":         break                           # NEXT
-        elif        pressed_button == "E":         sys.exit()                      # EXIT
-        elif        pressed_button == "T":         droid.ttsSpeak(items[pick])     # TEST
+        if done and pressed_button == "N":     break                           # NEXT
+        elif        pressed_button == "E":     sys.exit()                      # EXIT
+        elif        pressed_button == "T":     droid.ttsSpeak(items[pick])     # TEST
+        #elif        pressed_button == "T":     call(['espeak', '-v', language[pick], '-p',pitch, '-s', speed, items[pick]])     # TEST
         
     if   pick == "1":
         textLessSMB = 'Die neuen Einstellungen hätten weniger Bolus vorgeschlagen, nämlich um '
@@ -180,7 +201,7 @@ if IsAndroid :
         textUnit= ' Einheiten'
         both_ansage  = 'Prüf doch Mal die Lage.'
         carb_ansage0 = 'Du brauchst eventuell Kohlenhydrate,'
-        both_ansage1 = 'und zwar circa'
+        both_ansage1 = 'und zwar zirca'
         carb_ansage2 = 'Gramm in den nächsten'
         carb_ansage3 = 'Minuten'
         Speak_items = ["Extra Kohlenhydrate", "Extra Bolus", "Zuviel Bolus"]
@@ -195,7 +216,9 @@ if IsAndroid :
         carb_ansage2 = 'grams during the next'
         carb_ansage3 = 'minutes'
         Speak_items = ["extra carbs", "extra bolus", "less bolus"]
-        Speak_Pick  = "Pick Items"       
+        Speak_Pick  = "Pick Items"   
+
+    languageID = pick
 
 
     ###########################################################################
@@ -203,12 +226,13 @@ if IsAndroid :
     ###########################################################################
     btns  = {"N":"Next", "E":"Exit"}
     items = {}
-    varD = glob.glob(test_dir+'/*.dat')                     # outdated naming
+    varD = glob.glob(vdf_dir+'/*.dat')                     # outdated naming
     fcount = 1
     for varFile in varD:
         items[str(fcount)] = os.path.basename(varFile)      # do not overwrite the calling arg value
         fcount += 1
-    varF = glob.glob(test_dir+'/*.vdf')                     # preferred new naming
+    varF = glob.glob(vdf_dir+'/*.vdf')                     # preferred new naming
+    #print('suche in :', varF)
     for varFile in varF:
         items[str(fcount)] = os.path.basename(varFile)      # do not overwrite the calling arg value
         fcount += 1
@@ -219,11 +243,11 @@ if IsAndroid :
         #pick = selected_items_indexes[0]
         if done and pressed_button == "N":         break                           # NEXT
         elif        pressed_button == "E":         sys.exit()                      # EXIT
-        #lif        pressed_button == "S":         droid.ttsSpeak(items[pick])     # SHOW
+        #lif        pressed_button == "S":         #t droid.ttsSpeak(items[pick])     # SHOW
 
     #if pressed_button != 0 or selected_items_indexes == []:
     #    sys.exit()    
-    varFile = test_dir+items[pick]
+    varFile = vdf_dir+items[pick]
     
 
     ###########################################################################
@@ -232,7 +256,7 @@ if IsAndroid :
     btns  = {"N":"Next", "E":"Exit"}
     items = {}
     my_decimal = '.'
-    cfgF = glob.glob(test_dir+'/*.config')
+    cfgF = glob.glob(vdf_dir+'/*.config')
     fcount = 1
     for cfgFile in cfgF:
         items[str(fcount)] = os.path.basename(cfgFile)
@@ -248,10 +272,10 @@ if IsAndroid :
         #pick = selected_items_indexes[0]
         if done and pressed_button == "N":         break                           # NEXT
         elif        pressed_button == "E":         sys.exit()                      # EXIT
-        #lif        pressed_button == "S":         droid.ttsSpeak(items[pick])     # SHOW
+        #lif        pressed_button == "S":         #t droid.ttsSpeak(items[pick])     # SHOW
 
     #fnam= varLabel + '.dat'
-    cfg = open(test_dir+items[pick], 'r')
+    cfg = open(vdf_dir+items[pick], 'r')
     next_row= 'extraCarbs'
     for zeile in cfg:
         key = zeile[:1]
@@ -317,7 +341,7 @@ if IsAndroid :
     varyHome= '/storage/emulated/0/qpython/scripts3/'                       # command used to start this script
     #varyHome = os.path.dirname(varyHome) + '\\'
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
-    m +='\n vary_settings home directory  ' + varyHome
+    m +='\n emulator home directory  ' + varyHome
     #global echo_msg
     echo_msg = {}
     echo_msg = get_version_batch(echo_msg)
@@ -421,16 +445,22 @@ while wdhl[0]=='y':                                                             
             #valGram = eval(AlarmGram)
             signif  = valTime / valGram
             if signif<5 and thisTime>lastTime:                                      # above threshold of significance
+                #pint(both_ansage, carb_ansage0)
                 droid.ttsSpeak(both_ansage)
                 droid.ttsSpeak(carb_ansage0)
                 droid.ttsSpeak(both_ansage1 + str(valGram) + carb_ansage2 + AlarmTime + carb_ansage3)
+                #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, both_ansage])
+                #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, carb_ansage0])
+                #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, both_ansage1 + str(valGram) + carb_ansage2 + AlarmTime + carb_ansage3])
         #print("extra bolus", str(thisInt in pickMoreSMB), str(extraSMB))
         if (thisInt in pickMoreSMB) and extraSMB>0 and thisTime>lastTime:
-            droid.ttsSpeak(textMoreSMB+str(extraSMB)+textUnit)                      # wake up user, also during sleep?
+            droid.ttsSpeak(textMoreSMB+str(extraSMB)+textUnit)
+            #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, textMoreSMB+str(extraSMB)+textUnit])    # wake up user, also during sleep?
         #print("less  bolus", str(thisInt in pickLessSMB), str(extraSMB))
         if (thisInt in pickLessSMB) and extraSMB<0 and thisTime>lastTime:
-            droid.ttsSpeak(textLessSMB+str(extraSMB)+textUnit)                      # wake up user, also during sleep?
-        howLong = waitNextLoop(loopInterval, thisTime, varFile[len(test_dir):-4])
+            droid.ttsSpeak(textLessSMB+str(extraSMB)+textUnit)
+            #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, textLessSMB+str(extraSMB)+textUnit])    # wake up user, also during sleep?
+        howLong = waitNextLoop(loopInterval, thisTime, varFile[len(vdf_dir):-4])
         lastTime = thisTime        
         time.sleep(howLong)
     else:   break                                                                   # on Windows run only once

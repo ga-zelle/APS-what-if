@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-02-25 22:06'
+    echo_msg['emulator_core.py'] = '2025-03-24 17:13'       # daylight savings clock switch spring 2025 
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -632,6 +632,7 @@ def extractResultComponent(st, key, keyStart, keyEnd):
     return Curly
    
 def TreatLoop33(st, log, lcount, fn):
+    #print('entered TreatLoop33 in line',str(lcount))
     if not newLoop: return
     global utcOffset
     utcOffsetStr = extractResultComponent(st, 'utcOffset', '=', ',')
@@ -1191,9 +1192,13 @@ def get_currenttemp(lcount, st) :                       # key = 82
 def get_profile(lcount, st) :                           # key = 83
     global newLoop
     if not newLoop : return
+    #print(AAPS_Version, st)
     if AAPS_Version == '3.3':
         Curly = st
+        #print(activityMonitorCurly)
+        am_json = json.loads(activityMonitorCurly)
     else:
+        am_json= {}     # nothing from activity monitor separate json
         key = 'OapsProfileAutoIsf'
         wo = st.find(key)
         if wo>0:        # APS3.3-dev format
@@ -1215,6 +1220,15 @@ def get_profile(lcount, st) :                           # key = 83
         #print('\nnachher:', Curly)
         #print('char 5:', Curly[.10])  #, str(chr(Curly[948])))
     profile = json.loads(Curly)
+    for ele in am_json:
+            profile[ele] = am_json[ele]
+    #if AAPS_Version == '3.3':
+    #    if 'recent_steps_5_minutes'  not in profile:    profile['recentSteps5Minutes']  = 0  # omits ZERO
+    #    if 'recent_steps_10_minutes' not in profile:    profile['recentSteps10Minutes'] = 0  # omits ZERO
+    #    if 'recent_steps_15_minutes' not in profile:    profile['recentSteps15Minutes'] = 0  # omits ZERO
+    #    if 'recent_steps_30_minutes' not in profile:    profile['recentSteps30Minutes'] = 0  # omits ZERO
+    #    if 'recent_steps_60_minutes' not in profile:    profile['recentSteps60Minutes'] = 0  # omits ZERO
+    #    if 'activity_scale_factor' not in profile:    profile['recentSteps60Minutes'] = 0  # omits ZERO
     #profile['maxDeltaRatio'] = 0.2                     ### moved to new_parameter: additional parameter; define standard
     profile['row'] = lcount
     # unknown source, use apparent default:
@@ -1363,8 +1377,10 @@ def ConvertSTRINGooDate(stmp) :
          dlst =    0                                 # no dlst period winter 2023/24
     elif stmp < "2024-10-27T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2024
-    else:
+    elif stmp < "2025-03-30T02:00:00.000Z":
          dlst =    0                                 # no dlst period winter 2024/5
+    else:
+         dlst = 3600                                 #    dlst period summer 2025
     MSJahr		= eval(    stmp[ 0:4])
     MSMonat		= eval('1'+stmp[ 5:7]) -100
     MSTag		= eval('1'+stmp[ 8:10])-100
@@ -1389,7 +1405,7 @@ def scanLogfile(fn, entries):
     global fn_base                              # keep first match in case of wild card file list
     global log
     global varlog
-    global newLoop
+    global newLoop, activityMonitorCurly
     global dataType_offset, AAPS_Version
     global CarbReqGram,  CarbReqTime, lastCOB
     
@@ -1512,7 +1528,6 @@ def scanLogfile(fn, entries):
                             #version_set = True                              # keep until next logfile is loaded
                             pass
                         if Block2.find('AutoISF')>0:                         AAPS_Version = '3.3'    # during dev only?
-                        #print('AAPS versoin:', AAPS_Version, '   found:', dataTxt)
                         if   dataTxt[:16] == 'RhinoException: ' :           code_error(lcount, dataStr)
                         elif dataTxt[:16] == 'Glucose status: ' :           get_glucose_status(lcount, dataStr)
                         elif dataTxt[:16] == 'IOB data:       ' and AAPS_Version!='3.3':     get_iob_data(lcount, dataStr, log, zeile[:8])
@@ -1554,6 +1569,8 @@ def scanLogfile(fn, entries):
                             #and 'lastTempAge' in SMBreason :   
                             cont = TreatLoop(Curly, log, lcount, fn)
                             if cont=='STOP' or cont=='SYNTAX':     return cont
+                    elif zeile.find("Activity Monitor json:") > 0 :
+                        activityMonitorCurly = hole(zeile, 20, '{', '}')
                     elif zeile.find('[PersistenceLayerImpl$insertOrUpdateApsResult$2.apply():') > 0:
                                                                             cont = TreatLoop33(zeile, log, lcount,fn)
                                                                             if cont=='STOP' or cont=='SYNTAX':     return cont
