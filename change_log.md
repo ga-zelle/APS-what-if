@@ -1,3 +1,10 @@
+05.May.2025
+===========
+Added handling of planned new AutoISF features
+- state automation functionality proposed by faldor20
+- gentle transition when Libre calibration introduces a sudden offset in BG values
+
+
 25.Mar.2025
 ===========
 Further adaptations for AAPS3.3.2 logfile format
