@@ -1,12 +1,12 @@
 05.May.2025
-===========
+-----------
 Added handling of planned new AutoISF features
 - state automation functionality proposed by faldor20
 - gentle transition when Libre calibration introduces a sudden offset in BG values
 
 
 25.Mar.2025
-===========
+-----------
 Further adaptations for AAPS3.3.2 logfile format
 Included AutoISF bug fixes for
 - reporting iobTH settings
@@ -18,25 +18,25 @@ works for the dedicated AutoISF version, not for standard or dev versions of AAP
 
 
 31.Aug.2024
-===========
+-----------
 Adapted to read the new AAPS3.3-dev logfile format. That format may change as long as 3.3 is in dev state.
 Documentation
 - Libre Office proforma now has macros for importing CSV file and generating the standard plots from the CSV file.
 
 
 05.Jun.2024
-===========
+-----------
 Activity Monitor sleeping hours need to be shifted from local time to UTC.
 The UTC offset is extracted from the logfiles.
 
 
 02.Jun.2024
-===========
+-----------
 Re-enabled output of DELTA file
 
 
 May 2024
-========
+--------
 Adapted for APPS 3.2.0.4
 Adapted for autoISF3.0.1
 Documentation
@@ -45,13 +45,13 @@ Documentation
 
 
 25.Nov.2023
-===========
+-----------
 Adapted for autoISF3.0
 Adapted for AAPS 3.2.0.2
 
 
 12.Apr.2023
-===========
+-----------
 Adapted for autoISF 2.2.8.1
 New capabilities
  - added commands to define circumdian profiles for lower and higher targets
@@ -70,12 +70,12 @@ Bug fixes
 
 
 05.Sep.2022
-===========
+-----------
 Adapted for autoISF version 2.2.7
 
 
 05.May.2022
-===========
+-----------
 Adapted for AAPS version 3.0.0., still backward compatible down to version 2.5 as far as regular AAPS featutres are concerned
 Added the autoISF features to its version 2.2.6
  - the various ISF factors are listed separately and replace the varius interim ISF columns
@@ -89,17 +89,15 @@ Removed bugs
  - no more time shift between glucose curve and fitted curve
  
  
-
 20.Apr.2021
-===========
+-----------
 Debugging
  - Skip events flaged as  "Error: CGM data is unchanged for the past ~45m. "
  - added more default settings
 
 
-
 11.Apr.2021
-===========
+-----------
 Adapted for AAPS version 2.8.2, still backward compatible down to version 2.5 
 Major addition
  - checking user formulae in VDF-File for correct python syntax
@@ -111,9 +109,8 @@ Removed bugs
  - European daylight savings time added for summer 2021
  
 
-
 18.Nov.2020
-===========
+-----------
 Adapted for AAPS version 2.7, still compatible with versions 2.5 and 2.6
 Major addition
  - support autoISF for BG being consistantly too high for a longer time
@@ -129,9 +126,8 @@ Limitation
  - the flowchart output for version 2.7 uses outdated row number references
 
 
-
 31.May 2020
-===========
+-----------
 Major addition
  - GUI front end to collect inputs and guide users who are less IT literate
  - STAIR to define time dependent variations like basal rate
@@ -143,9 +139,8 @@ Removed bugs
  - one reporting error in assigning the variations
 
 
-
 22.April 2020
-=============
+-------------
 Extended the selection of logfiles to define the evaluation time window by
  - using wildcard characters "*" and "?" to match several logfiles like AndroidAPS._2020-04-02* for a whole day
  - define a start time for the emulation in UTC format like "2020-04-02T10:00:00Z" for noon MESZ time zone
@@ -158,16 +153,14 @@ Added graphic output for
 Debugged one error in determine-basal.py
 
 
-
 31.March 2020
-=============
+-------------
 Adapted for AAPS verison 2.6.1
 Debugged / added DLST handling for summer 2019 through to summer 2020 in ME(S)Z time zone
 
 
-
 08.March 2020
-=============
+-------------
 Changes Related to variant definition improve checking the success of variant definition process:
  - debugged reporting of new, additional parameters
  - added reporting of ignored instructions
