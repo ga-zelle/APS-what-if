@@ -23,7 +23,9 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-03-24 17:13'       # daylight savings clock switch spring 2025 
+    echo_msg['emulator_core.py'] = '2025-05-26 02:27'       # fit table output for Qpython+; fix logfile close error
+    #cho_msg['emulator_core.py'] = '2025-05-03 17:08'       # add calibration transition support
+    #cho_msg['emulator_core.py'] = '2025-04-19 23:49'       # add state automation support
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -277,7 +279,7 @@ def setVariant(stmp):
     global iob_data #, utcOffset
     global meal_data
     global profile
-    global new_parameter, autoISF_version
+    global new_parameter, autoISF_version, state
     ####################################################################################################################################
     # additional parameters collected here
     # these need an according modification in "determine_basal.py"
@@ -364,13 +366,23 @@ def setVariant(stmp):
                 profile['inactivity_idle_start'] = profile['activity_idle_start']
                 profile['inactivity_idle_end'] = profile['activity_idle_end']
             if 'inactivity_idle_start' not in profile:
-                profile['inactivity_idle_start'] = 0
-                profile['inactivity_idle_end'] = 0
+                profile['inactivity_idle_start'] = 22
+                profile['inactivity_idle_end'] = 7
+        #print('overnight', str(profile['ignore_inactivity_overnight']), str(profile['inactivity_idle_start']),'-', profile['inactivity_idle_end'])
         if 'parabola_fit_source' not in profile:            ### predating A3.2.0.2 Libre3
             profile['parabola_fit_source'] = 5              ### standard CGMs at 5m interval
         if AAPS_Version == '<2.7':                          
             profile['maxUAMSMBBasalMinutes'] = 30           ### use the 2.7 default just in case
             profile['bolus_increment'] = 0.1                ### use the 2.7 default just in case
+        #if 'Sleeping' not in state:                        ### for pre-state automation logfiles ...
+        #    state['Sleeping'] = '"False"'
+        #if 'query_got_up' not in state:
+        #    state['query_got_up'] = '"ignore"'
+        #print(str(state))
+        if 'Calibration' not in state:
+            state['Calibration'] = '"done"'
+        if 'calibrationIgnore' not in profile:
+            profile['calibrationIgnore']= True
     ####################################################################################################################################
     STAIR    = {}                                                   # for general, profile like definitions
     STAIR_BAS= {}                                                   # for profile definition of basal rate
@@ -509,7 +521,15 @@ def setVariant(stmp):
 
             logmsg = 'appended new entry to'
             validRow = True
-            if   myArray == 'new_parameter' :                                         # allow also string type assignments like "<V2.7"
+            if   myArray == 'state' :                                               # allow also string type assignments
+                if myItem in state :
+                    logmsg = 'edited old value of '+str(state[myItem])+' in'
+                if myVal[0] == '"' :
+                    state[myItem] =      myVal[1:-1]                                # string variable
+                else:
+                    state[myItem] = eval(myVal)                                     # normal case of numeric or booolean variable
+                logres = str(state[myItem])
+            elif myArray == 'new_parameter' :                                       # allow also string type assignments like "<V2.7"
                 if myItem in new_parameter :
                     logmsg = 'edited old value of '+str(new_parameter[myItem])+' in'
                 if myVal[0] == '"' :
@@ -517,8 +537,8 @@ def setVariant(stmp):
                 else:
                     new_parameter[myItem] = eval(myVal)                             # normal case of numeric or booolean variable
                 logres = str(new_parameter[myItem])
-                
                 #if myItem == 'FSL_min_dur' and stmp=='1900-01-01T00:00:00':
+                pass
             if stmp=='1900-01-01T00:00:00':
                     return False                                                    # end of pre-scan
             if   myArray == 'autosens_data' :
@@ -588,7 +608,7 @@ def setVariant(stmp):
                 logres = myVal
             elif myArray != 'new_parameter':
                 validRow = False
-                if myArray != '':   varlog.write(myArray + ' is an inrecognised array/json/keyword')
+                if myArray != '':   varlog.write(myArray + ' is an unrecognised array/json/keyword')
         
             if (stmp != '1900-01-01T00:00:00') :
                 if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
@@ -607,6 +627,7 @@ def setVariant(stmp):
     #ew_parameter['AAPS_Version'] = AAPS_Version                ### flag to handle differences in determine-basal
     if (stmp != '1900-01-01T00:00:00') :
         profile['new_parameter'] = new_parameter                ### use profile as piggyback to get parameters into determine_basal
+        profile['state'] = state                                ### use profile as piggyback to get state values into determine_basal
         bg[-1] = glucose_status['glucose']                      ### just in case it got changed 
         global emulTarLow
         global emulTarHig
@@ -630,7 +651,7 @@ def extractResultComponent(st, key, keyStart, keyEnd):
     if wo_apo>0:
         Curly = Curly[:wo_apo-1]+Curly[wo_apo:]
     return Curly
-   
+
 def TreatLoop33(st, log, lcount, fn):
     #print('entered TreatLoop33 in line',str(lcount))
     if not newLoop: return
@@ -1077,7 +1098,7 @@ def get_glucose_status(lcount, st) :                    # key = 80
     #        print('deltas at '+str(mills), str(deltas[mills]))
     pass
 
-def get_iob_data(lcount, st, log, stampStr) :                     # key = 81
+def get_iob_data(lcount, st, log, stampStr) :           # key = 81
     if not newLoop: return
     global iob_data, utcOffset
     global activity
@@ -1189,6 +1210,14 @@ def get_currenttemp(lcount, st) :                       # key = 82
     #print ('currenttemp json -->    '+str(currenttemp))
     pass
 
+def getCalibrationJson(Curly, lcount):
+    global calibrationJson
+    cal_json = json.loads(Curly)
+    for ele in cal_json:
+        calibrationJson[ele] = cal_json[ele]
+    #print(str(lcount), str(calibrationJson))
+    pass
+    
 def get_profile(lcount, st) :                           # key = 83
     global newLoop
     if not newLoop : return
@@ -1222,6 +1251,8 @@ def get_profile(lcount, st) :                           # key = 83
     profile = json.loads(Curly)
     for ele in am_json:
             profile[ele] = am_json[ele]
+    for ele in calibrationJson:
+            profile[ele] = calibrationJson[ele]
     #if AAPS_Version == '3.3':
     #    if 'recent_steps_5_minutes'  not in profile:    profile['recentSteps5Minutes']  = 0  # omits ZERO
     #    if 'recent_steps_10_minutes' not in profile:    profile['recentSteps10Minutes'] = 0  # omits ZERO
@@ -1292,6 +1323,15 @@ def get_autoISF_extras(lcount, Curly):
     for ele in autoISF_extras:
         profile[ele] = autoISF_extras[ele]
     #print (str(profile))
+    pass
+
+def getStateValue(st):
+    global state
+    stJson = json.loads(st)
+    for ele in stJson:
+        state[ele] = stJson[ele]
+        pass
+    #print(str(state))
     pass
 
 def get_autosens_data(lcount, st) :                     # key = 86
@@ -1569,11 +1609,16 @@ def scanLogfile(fn, entries):
                             #and 'lastTempAge' in SMBreason :   
                             cont = TreatLoop(Curly, log, lcount, fn)
                             if cont=='STOP' or cont=='SYNTAX':     return cont
-                    elif zeile.find("Activity Monitor json:") > 0 :
+                    elif zeile.find('Activity Monitor json:') > 0 :
                         activityMonitorCurly = hole(zeile, 20, '{', '}')
                     elif zeile.find('[PersistenceLayerImpl$insertOrUpdateApsResult$2.apply():') > 0:
                                                                             cont = TreatLoop33(zeile, log, lcount,fn)
                                                                             if cont=='STOP' or cont=='SYNTAX':     return cont
+                    elif zeile.find(']: State json') > 0 :
+                        Curly = hole(sLine, 1+sOffset+len(Block2), '{', '}')
+                        getStateValue(Curly)
+                    elif zeile.find(']: Calibration json') > 0 :
+                        getCalibrationJson(hole(zeile, 20, '{', '}'), lcount)
                     #elif lcount>1400 and lcount<2000:   print('no match in row'+str(lcount)+':', Block2)
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
@@ -1587,7 +1632,10 @@ def scanLogfile(fn, entries):
         except UnicodeDecodeError:              # needed because "for zeile in lf" does not work with AAPS 2.5 containing non-printing ASCII codes
             lcount +=  1                        # skip this line, it contains non-ASCII characters!
             
-    lf.close()
+    try:
+        lf.close()
+    except:
+        time.sleep(10)                          # wait for zip conversion
     return cont
 
 def echo_rT(reT):                                       # echo the unusual SMB result
@@ -2388,7 +2436,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  origAs_ratio, emulAs_ratio              # Autosense
     global  origAI_ratio, emulAI_ratio              # autoISF
     global  origiob, origcob, origiobTH, emuliobTH, tolerance_iobTH
-    global  activity
+    global  activity, state, calibrationJson
     global  origInsReq, emulInsReq
     global  origSMB, emulSMB, origMaxBolus, emulMaxBolus
     global  origBasal, emulBasal, lastBasal
@@ -2409,6 +2457,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     linFit      = {}
     cubFit      = {}
     bgTimeMap   = {}
+    
+    state       = {}
+    calibrationJson = {}
     
     loop_mills  = []
     loop_label  = []
@@ -2943,7 +2994,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             head2 += '   orig   emul'
     
     if isAndroid :
-        maxItems = 15          
+        maxItems = 14         
     else:
         maxItems = len(loop_label)
         if loopCount > 0 :          XYplots(loopCount, head1, head2, entries)
@@ -2953,7 +3004,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     if isAndroid :
         os.system('clear')
         if len(head1) == 92:    tail = ' '                              # this is double of portrait width
-        log_msg('\n'+head1+tail)
+        log_msg(head1+tail)
         log_msg(head2+tail)                                             # 1 record per print for safe rotations
         for thisTime in sorted_entries[len(sorted_entries)-top10:]:     # last hour plus
             values = entries[thisTime]

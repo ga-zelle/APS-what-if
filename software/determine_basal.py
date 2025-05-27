@@ -10,7 +10,9 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2025-03-22 23:06'
+    echo_msg['determine_basal.py'] = '2025-05-05 04:01'         ### de-activate steps debug statement
+    #cho_msg['determine_basal.py'] = '2025-05-03 17:36'         ### extension for calibration transition
+    #cho_msg['determine_basal.py'] = '2025-04-20 01:04'         ### extension for state automation
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -55,7 +57,7 @@ def my_ce_file(filnam) :
     ### added to get and hold the name of the console.error filename
     global ce_file
     ce_file = filnam
-    
+
 def console_error(sb, *argstr):
     #   concatenate arguments by inserting single BLANK
     #   also, enforce all later arguments to be string type
@@ -212,7 +214,7 @@ def enable_smb(profile, microBolusAllowed, meal_data, target_bg, Flows) :
     console_error("SMB disabled (no enableSMB preferences active or no condition satisfied)")
     return False
 
-def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flows):
+def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, thisTime, state, Flows):
     iobThUser = profile['iob_threshold_percent']
     if ( useIobTh ) :
         if (profile['max_iob'] < 0.001 ) :
@@ -230,6 +232,14 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
         
     if ( not microBolusAllowed ) :
         return "AAPS"                                                  #// see message in enable_smb
+    if state['Calibration'] == 'ongoing':
+        console_error("SMB disabled while calibrating")
+        return "blocked"
+    if not profile['calibrationIgnore']:
+        calibrationMinutes = profile['calibrationDuration'] - (thisTime - profile['calibrationStart'])/60000
+        if calibrationMinutes > 0:
+            console_error('SMB disabled while calibrating for another '+str(round(calibrationMinutes,0))+'m')
+            return "blocked"
     gz_proto = 'full_basal_exercise_target' in profile
     if ( profile['enableSMB_EvenOn_OddOff_always'] ):
         Flows.append(dict(title="SMB settings by full loop logic", indent='0', adr='loop_203'))
@@ -269,7 +279,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
             #    msg = "maxIOB "+ str(short(profile['max_iob']))
             console_error("SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is above effective iobTH "+str(short(iobThEffective)))
             Flows.append(dict(title="SMB disabled by Full Loop logic: iob "+str(iob_data['iob'])+" is above effective iobTH "+str(short(iobThEffective)), indent='1', adr='loop_227'))
-            console_error("Loop power level temporarely capped")
+            console_error("Loop power level temporarily capped")
             return "iobTH"
         else :
             console_error("SMB enabled; current target " +str(target) +msgUnits +msgEven +msgTail)
@@ -281,7 +291,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
                 return "enforced"                                           # even number
     console_error("Loop allows APS power level")
     return "AAPS"                                                           # leave it to standard AAPS
-        
+
 def capInsulin(insulinReq, myTarget, myBg, insulinCap, Flows):
     # if Bg is below Target (especially over night) then reduce insulinReq 
     # this is in case a short rise due to noisy ES signal releases too much insulin and we stay below target all the time
@@ -405,11 +415,11 @@ def withinISFlimits(liftISF, minISFReduction, maxISFReduction, sensitivityRatio,
         if (liftISF <= sensitivityRatio):       origin_sens = ""
     console_error("final ISF factor is", str(short(round(final_ISF,2))) + origin_sens)
     console_error("----------------------------------")
-    console_error("end autoISF")
+    console_error("end AutoISF")
     console_error("----------------------------------")
     return final_ISF
 
-def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, Fcasts, Flows, emulAI_ratio):
+def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, thisTime, state, Fcasts, Flows, emulAI_ratio):
     #### gz mod 6: dynamic ISF based on dimensions of 5% band
     #Fcasts['origISF'] = profile['sens']                        # taken from original logfile
     #Fcasts['autoISF'] = sens                                   # as modified by autosense; taken from original logfile
@@ -420,6 +430,28 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
     Fcasts['acceISF'] = 1               #profile['sens']  
     Fcasts['dura_ISF'] = 1              #profile['sens']  
     Fcasts['emulISF'] = sens
+    if state['Calibration'] == 'ongoing' :
+        console_error("AutoISF weights disabled while calibrating")
+        console_error("----------------------------------")
+        console_error("end AutoISF")
+        console_error("----------------------------------")
+        return sens
+    
+    if not profile['calibrationIgnore']:
+        calibrationMinutes = profile['calibrationDuration'] - (thisTime - profile['calibrationStart'])/60000
+        if calibrationMinutes > 0:
+            console_error('AutoISF weights disabled while calibrating')
+            console_error("----------------------------------")
+            console_error("end AutoISF")
+            console_error("----------------------------------")
+            return sens
+            
+    if state['Calibration'] == 'ongoing' :
+        console_error("AutoISF weights disabled while calibrating")
+        console_error("----------------------------------")
+        console_error("end AutoISF")
+        console_error("----------------------------------")
+        return sens
     
     if not profile['enable_autoISF']:
         console_error("autoISF disabled in Preferences")
@@ -592,10 +624,10 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
         return round(profile['sens'] / final_ISF, 1)
     #else:
     console_error("----------------------------------")
-    console_error("end autoISF")
+    console_error("end AutoISF")
     console_error("----------------------------------")
     return sens
-    
+
 ## insert flowchart things above
 
 def determine_varSMBratio(profile, bg, target_bg, loop_wanted_smb, Flows):
@@ -629,7 +661,7 @@ def determine_varSMBratio(profile, bg, target_bg, loop_wanted_smb, Flows):
     console_error('SMB delivery ratio set to interpolated value', new_SMB)
     return new_SMB
 
-def activityMonitor(profile, bg, target_bg, thisTime, utcOffset):
+def activityMonitor(profile, bg, target_bg, thisTime, utcOffset, state):
     hour = int(thisTime / 3600 / 1000) % 24
     if hour <1:  hour = 1
         
@@ -666,7 +698,13 @@ def activityMonitor(profile, bg, target_bg, thisTime, utcOffset):
     inactivity_idle_end = (profile['inactivity_idle_end'] - utcOffset) % 24
     activityRatio = 1.0
 
+    existSleepState = 'Sleeping' in state
+    if existSleepState and state['Sleeping'] == 'True':
+        useSleepState = True
+    else:
+        useSleepState = False
     #print('sleeping', str(inactivity_idle_start), str(inactivity_idle_end), str(hour))
+    #print(str(thisTime), str(time_since_start), str(recentSteps60Minutes))
     
     if ( not activityDetection ) :
         if 'activity_detection' in profile or 'key_activity_detection' in profile:
@@ -678,10 +716,12 @@ def activityMonitor(profile, bg, target_bg, thisTime, utcOffset):
     else :
         if ( time_since_start < 60 and recentSteps60Minutes <= 200 ) :
             console_error("Activity monitor initialising for "+str(60-time_since_start)+" more minutes: inactivity detection disabled")
-        elif ( ( inactivity_idle_start>inactivity_idle_end and ( hour>=inactivity_idle_start or hour<inactivity_idle_end ) ) #//inludes midnight
-            or ( hour>=inactivity_idle_start and hour<inactivity_idle_end) #// excludes midnight
-            and recentSteps60Minutes <= 200 and ignore_inactivity_overnight ) :
-            console_error("Activity monitor disabled: sleeping hours")
+        elif ( useSleepState and recentSteps60Minutes <= 200 ):
+            console_error("Activity monitor disabled inactivity detection: sleeping state")
+        elif ((( inactivity_idle_start>inactivity_idle_end and ( hour>=inactivity_idle_start or hour<inactivity_idle_end ) ) #//inludes midnight
+            or ( hour>=inactivity_idle_start and hour<inactivity_idle_end)) #// excludes midnight
+            and recentSteps60Minutes <= 200 and ignore_inactivity_overnight and not existSleepState) :
+            console_error("Activity monitor disabled inactivity detection: sleeping hours")
         elif ( recentSteps5Minutes > 300 or recentSteps10Minutes > 300 or recentSteps15Minutes > 300 or recentSteps30Minutes > 1500 or recentSteps60Minutes > 2500 ) :
             #stepActivityDetected = True
             activityRatio = 1 - 0.3 * activity_scale_factor
@@ -722,6 +762,8 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     if 'new_parameter' in profile:
         new_parameter = profile['new_parameter']                    ###
         AAPS_Version = new_parameter['AAPS_Version']                ### required from 2.7 onwards
+    if 'state' in profile:
+        state = profile['state']
     
     profile_current_basal = round_basal(profile['current_basal'], profile)
     basal = profile_current_basal
@@ -827,7 +869,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         rT['error'] ='Error: could not determine target_bg. '
         return rT
 
-    activityRatio = activityMonitor(profile, bg, target_bg, thisTime, iob_data['utcOffset'])   #// stepActivityDetected, stepInactivityDetected);
+    activityRatio = activityMonitor(profile, bg, target_bg, thisTime, iob_data['utcOffset'], state)   #// stepActivityDetected, stepInactivityDetected);
     stepActivityDetected = False
     stepInactivityDetected = False
     if   (activityRatio<1) :        stepActivityDetected = True
@@ -980,7 +1022,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     console_error("CR:", profile['carb_ratio'])
 
     console_error("----------------------------------")
-    console_error("start autoISF", profile['autoISF_version'])
+    console_error("start AutoISF", profile['autoISF_version'])
     console_error("----------------------------------")
     #// mod autoISF3.0-dev: if that would put us over iobTH, then reduce accordingly; allow 30% overrun
     iobTHtolerance = 130.0
@@ -991,7 +1033,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     enableSMB=False
     #// disable SMB when a high temptarget is set
     Flows.append(dict(title='leave SMB off?', indent='0', adr='348'))
-    loop_wanted_smb = loop_smb(microBolusAllowed, profile, iob_data, use_iobTH, iobTHvirtual/iobTHtolerance*100.0, Flows)
+    loop_wanted_smb = loop_smb(microBolusAllowed, profile, iob_data, use_iobTH, iobTHvirtual/iobTHtolerance*100.0, thisTime, state, Flows)
     if (microBolusAllowed and loop_wanted_smb != "AAPS") :
         if ( loop_wanted_smb=="enforced" or loop_wanted_smb=="fullLoop" ):   #// otherwise FL switched SMB off
             enableSMB = True
@@ -1074,7 +1116,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             Flows.append(dict(title="SMB disabled\nno enableSMB\npreferences active", indent='+1', adr='407'))
             console_error("SMB disabled (no enableSMB preferences active)")
     #console_error("-- end checking advanced SMB logic ---------")
-    sens = autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, Fcasts, Flows, emulAI_ratio)
+    sens = autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, thisTime, state, Fcasts, Flows, emulAI_ratio)
     
     #lastTempAge;
     if (typeof (iob_data['lastTemp']) != 'undefined' ):

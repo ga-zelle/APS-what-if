@@ -12,7 +12,8 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2025-03-24 17:16'      # Hilfe gegen lispelndes Deutsch
+    echo_msg['emulator_batch.py'] = '2025-05-27 14:00'      # fit table output for Qpython+; adapt VDF home
+    #cho_msg['emulator_batch.py'] = '2025-04-09 03:18'      # Logdir geändert
     return echo_msg
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
@@ -93,7 +94,7 @@ def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss o
             waitSec = 60                        # was even negative sometimes
     then = datetime.now() + timedelta(seconds=waitSec)
     thenStr = format(then, '%H:%M:%s')
-    print ('\nWaiting ' + str(waitSec) + 'sec for next loop at '+ thenStr[:8] + ';   Variant "' + varName + '"', end='\r')
+    print ('Waiting ' + str(waitSec) + 'sec for next loop at '+ thenStr[:8] + ';   Variant "' + varName + '"', end='\r')
     return waitSec
 
 def alarmHours(titel):
@@ -137,32 +138,29 @@ global echo_msg
 IsAndroid = False
 test_file = 'AndroidAPS.log'
 
-test_dir14= '/storage/emulated/0/Documents/AAPS/logs/'
-inh14     = glob.glob(test_dir14+'*')            # for Android11+ using AAPS 3.0+
+test_dir14= '/storage/emulated/0/Documents/aapsLogs/'
+inh14     = glob.glob(test_dir14+'*')            # for Android11+ using AAPS 3.3+
 if len(inh14) > 0:
     IsAndroid = True
-    test_dir = test_dir14
-    fn = test_dir + test_file
+    vdf_dir = test_dir14
+    fn = vdf_dir + test_file
     print('gefunden:', fn)
-    vdf_dir = test_dir[:-5]
     
 test_dir10= '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'    # always find it even when starting new logfile
 inh10     = glob.glob(test_dir10+'*')            # for Android10 or less using AAPS 2.8.2
 if not IsAndroid and len(inh10) > 0:
     IsAndroid = True
-    test_dir = test_dir10
-    fn = test_dir + test_file
+    vdf_dir = test_dir10
+    fn = vdf_dir + test_file
     print('gefunden:', fn)
-    vdf_dir = test_dir
 
 test_dir11= '/storage/emulated/0/AAPS/logs/info.nightscout.androidaps/'
 inh11     = glob.glob(test_dir11+'*')            # for Android11+ using AAPS 3.0+
 if not IsAndroid and len(inh11) > 0:
     IsAndroid = True
-    test_dir = test_dir11
-    fn = test_dir + test_file
+    vdf_dir = test_dir11
+    fn = vdf_dir + test_file
     print('gefunden:', fn)
-    vdf_dir = test_dir
     
 if IsAndroid :
     import androidhelper
@@ -338,7 +336,7 @@ if IsAndroid :
 
     #arg2 = 'Android/.'+''.join(['/'+items[i] for i in selected_items_indexes])# the feature list what to plot
     #arg2+= '/.'                                                            # always decimal "." on Android
-    varyHome= '/storage/emulated/0/qpython/scripts3/'                       # command used to start this script
+    varyHome= '/storage/emulated/0/Android/data/org.qpython.plus/scripts3/'      # command used to start this script
     #varyHome = os.path.dirname(varyHome) + '\\'
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
     m +='\n emulator home directory  ' + varyHome
@@ -369,7 +367,7 @@ else:                                                                           
     #test_file = 'AndroidAPS._2020-07-13_00-00-00_.2.zip'
     #fn = test_dir + test_file
     #ClearScreenCommand = 'cls'                     # done in --core.py
-    maxItem = '144'    # shows all
+    #maxItem = '144'    # shows all
 
     varyHome= sys.argv[0]                           # command used to start this script
     whereColon = varyHome.find(':')
