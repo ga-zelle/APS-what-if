@@ -23,7 +23,9 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-05-03 17:08'       # add calibration transition support
+    echo_msg['emulator_core.py'] = '2025-06-25 02:58'       # re-enable plotting predictions
+    #cho_msg['emulator_core.py'] = '2025-05-26 02:27'       # fit table output for Qpython+; fix logfile close error
+    #cho_msg['emulator_core.py'] = '2025-05-03 17:08'       # add calibration transition support
     #cho_msg['emulator_core.py'] = '2025-04-19 23:49'       # add state automation support
     return echo_msg
 
@@ -638,8 +640,8 @@ def setVariant(stmp):
 
 def getOrigPred(predBGs):
     Fcasts = {}
-    #for BGs in predBGs:
-    #    Fcasts[BGs] = predBGs[BGs]
+    for BGs in predBGs:
+        Fcasts[BGs] = predBGs[BGs]
     #print ('orig preds --> '+str(Fcasts))
     return Fcasts
 
@@ -1631,7 +1633,10 @@ def scanLogfile(fn, entries):
         except UnicodeDecodeError:              # needed because "for zeile in lf" does not work with AAPS 2.5 containing non-printing ASCII codes
             lcount +=  1                        # skip this line, it contains non-ASCII characters!
             
-    lf.close()
+    try:
+        lf.close()
+    except:
+        time.sleep(10)                          # wait for zip conversion
     return cont
 
 def echo_rT(reT):                                       # echo the unusual SMB result
@@ -2158,7 +2163,7 @@ def XYplots(loopCount, head1, head2, entries) :
                                 tfit = []
                                 fitcolor = ['#ff00ff',  '#900090']                          # faint violett = magenta, dark violett
                                 isBest = ( i==iMax)
-                                tx = bgTime[bgFrame] +5*60                                   # window end time = +5min from last glucose
+                                tx = bgTime[bgFrame] +5*60                                  # window end time = +5min from last glucose
                                 while tx >= bgTime[bgFrame]-dur*60:
                                     ti = (tx - bgTime[bgFrame])/300
                                     bfit.append(a2*pow(ti,2) + a1*ti + a0)
@@ -2300,7 +2305,9 @@ def XYplots(loopCount, head1, head2, entries) :
                             axbg.plot([0,0], [0,0], linestyle='dashed', color='grey', label='...')# inactive, i.e. off screen; placeholder for legend
         
                         for el in Fcasts:
-                            print(loop_label[iFrame], el)
+                            print(el)
+                        #print('SMBsource='+SMBsource)
+
                         if 'COB' in Fcasts:                                                 # assume same logic as in original
                             origCOB = Fcasts['COB']                                         # the original array from logfile
                             initCOB = Fcasts['COBinitBGs']                                  # the emulated array before cleanup
@@ -2312,8 +2319,12 @@ def XYplots(loopCount, head1, head2, entries) :
                             axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['COB'], label='no COB active') # inactive
                         
                         if 'UAM' in Fcasts :                                                # same logic as in original or minGuard source
-                            origUAM = Fcasts['UAM']                                         # the initial array before cleanup
+                            origUAM = Fcasts['UAM']                                         # from the orig loop
+                            initUAM = Fcasts['UAMinitBGs']                                  # the initial array before cleanup
+                            predUAM = Fcasts['UAMpredBGs']
                             axbg.plot(origUAM, fcastmills[:len(origUAM)], linestyle='solid',            color=colFav['UAM'], label='predUAM, original')
+                            axbg.plot(initUAM, fcastmills[:len(initUAM)], linestyle='None', marker='.', color=colFav['UAM'], fillstyle='none')
+                            axbg.plot(predUAM, fcastmills[:len(predUAM)], linestyle='None', marker='.', color=colFav['UAM'], label='predUAM, emulated')
                         elif 'UAM'==SMBsource :
                             initUAM = Fcasts['UAMinitBGs']                                  # the initial array before cleanup
                             predUAM = Fcasts['UAMpredBGs']
@@ -2333,8 +2344,8 @@ def XYplots(loopCount, head1, head2, entries) :
                             axbg.plot([0,0], [0,0],                       linestyle='none',             color=colFav['IOB'], label='no IOB active') # inactive
         
                         if 'ZT' in Fcasts:                                                  # assume same logic as in original
-                            origZT = Fcasts['ZT']                                               # from the orig loop
-                            initZT = Fcasts['ZTinitBGs']                                        # the initial array before cleanup
+                            origZT = Fcasts['ZT']                                           # from the orig loop
+                            initZT = Fcasts['ZTinitBGs']                                    # the initial array before cleanup
                             predZT = Fcasts['ZTpredBGs']
                             axbg.plot(origZT,  fcastmills[:len(origZT)],  linestyle='solid',            color=colFav['ZT'],  label='predZT, original')
                             axbg.plot(initZT,  fcastmills[:len(initZT)],  linestyle='None', marker='.', color=colFav['ZT'],  fillstyle='none')
@@ -2990,7 +3001,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
             head2 += '   orig   emul'
     
     if isAndroid :
-        maxItems = 15          
+        maxItems = 14         
     else:
         maxItems = len(loop_label)
         if loopCount > 0 :          XYplots(loopCount, head1, head2, entries)
@@ -3000,7 +3011,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     if isAndroid :
         os.system('clear')
         if len(head1) == 92:    tail = ' '                              # this is double of portrait width
-        log_msg('\n'+head1+tail)
+        log_msg(head1+tail)
         log_msg(head2+tail)                                             # 1 record per print for safe rotations
         for thisTime in sorted_entries[len(sorted_entries)-top10:]:     # last hour plus
             values = entries[thisTime]

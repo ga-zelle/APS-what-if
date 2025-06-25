@@ -10,7 +10,8 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2025-05-03 17:36'         ### extension for calibration transition
+    echo_msg['determine_basal.py'] = '2025-05-05 04:01'         ### de-activate steps debug statement
+    #cho_msg['determine_basal.py'] = '2025-05-03 17:36'         ### extension for calibration transition
     #cho_msg['determine_basal.py'] = '2025-04-20 01:04'         ### extension for state automation
     return echo_msg
 
@@ -703,7 +704,7 @@ def activityMonitor(profile, bg, target_bg, thisTime, utcOffset, state):
     else:
         useSleepState = False
     #print('sleeping', str(inactivity_idle_start), str(inactivity_idle_end), str(hour))
-    print(str(thisTime), str(time_since_start), str(recentSteps60Minutes))
+    #print(str(thisTime), str(time_since_start), str(recentSteps60Minutes))
     
     if ( not activityDetection ) :
         if 'activity_detection' in profile or 'key_activity_detection' in profile:
