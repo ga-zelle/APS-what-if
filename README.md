@@ -30,5 +30,8 @@ track which statements in "determineSMB-basal" were executed and which not toget
 of those decisions taken from the original code.
 
 # Limitation
-There is an interim release of python for Android-14 and above which seems to allow running the emulator on phones.
-The documentation for installation and use on Android needs to be updated because at the moment it looks more difficult. 
+There is an interim release called qpythonplus required for Android14 and above which allows running the emulator on phones. 
+The documentation for installation and use on Android needs to be updated because folders have changed. 
+With older Android versions the previous qpython 3L / 3S still work, even with these updated scripts.
+
+For downloading the Android14+ version go to https://drive.google.com/drive/u/3/folders/1lFqvlmArrV35ikcdW61MdVAx2UUWMcLh 
