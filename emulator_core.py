@@ -2304,10 +2304,6 @@ def XYplots(loopCount, head1, head2, entries) :
                             SMBsource = ''
                             axbg.plot([0,0], [0,0], linestyle='dashed', color='grey', label='...')# inactive, i.e. off screen; placeholder for legend
         
-                        for el in Fcasts:
-                            print(el)
-                        #print('SMBsource='+SMBsource)
-
                         if 'COB' in Fcasts:                                                 # assume same logic as in original
                             origCOB = Fcasts['COB']                                         # the original array from logfile
                             initCOB = Fcasts['COBinitBGs']                                  # the emulated array before cleanup
