@@ -23,7 +23,8 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-06-25 02:58'       # re-enable plotting predictions
+    echo_msg['emulator_core.py'] = '2025-07-09 03:00'       # defaulting calibrationDuration
+    #cho_msg['emulator_core.py'] = '2025-06-25 02:58'       # re-enable plotting predictions
     #cho_msg['emulator_core.py'] = '2025-05-26 02:27'       # fit table output for Qpython+; fix logfile close error
     #cho_msg['emulator_core.py'] = '2025-05-03 17:08'       # add calibration transition support
     #cho_msg['emulator_core.py'] = '2025-04-19 23:49'       # add state automation support
@@ -1213,10 +1214,16 @@ def get_currenttemp(lcount, st) :                       # key = 82
 
 def getCalibrationJson(Curly, lcount):
     global calibrationJson
+    #print(fn, fn[-4:], str(lcount))
+    #print('calibration json input='+Curly)
+    if fn[-4:] != '.zip':       Curly = Curly[:-1]      # for non-zipped file 
+    #print('calibration json input='+Curly)
+    if Curly[-1:] != '}':       Curly += '}'            # incomplete during 7.Jun.2925
     cal_json = json.loads(Curly)
     for ele in cal_json:
         calibrationJson[ele] = cal_json[ele]
-    #print(str(lcount), str(calibrationJson))
+    if 'calibrationDuration' not in calibrationJson:    calibrationJson['calibrationDuration']=20
+    #print(str(calibrationJson))
     pass
     
 def get_profile(lcount, st) :                           # key = 83
@@ -1619,7 +1626,7 @@ def scanLogfile(fn, entries):
                         Curly = hole(sLine, 1+sOffset+len(Block2), '{', '}')
                         getStateValue(Curly)
                     elif zeile.find(']: Calibration json') > 0 :
-                        getCalibrationJson(hole(zeile, 20, '{', '}'), lcount)
+                        getCalibrationJson(zeile[zeile.find('{'):], lcount)           # drop <CR> ?
                     #elif lcount>1400 and lcount<2000:   print('no match in row'+str(lcount)+':', Block2)
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
