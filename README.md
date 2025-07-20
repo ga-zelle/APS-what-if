@@ -29,9 +29,8 @@ A special output is the flowchart which helps to understand the logic flow throu
 track which statements in "determineSMB-basal" were executed and which not together with the reasoning 
 of those decisions taken from the original code.
 
-# Limitation
-There is an interim release called qpythonplus required for Android14 and above which allows running the emulator on phones. 
-The documentation for installation and use on Android needs to be updated because folders have changed. 
+# Latest major change
+There is a new release called QPythonPlus required for Android14 and above which allows running the emulator on phones. 
 With older Android versions the previous qpython 3L / 3S still work, even with these updated scripts.
 
 For downloading the Android14+ version go to https://drive.google.com/drive/u/3/folders/1lFqvlmArrV35ikcdW61MdVAx2UUWMcLh 
