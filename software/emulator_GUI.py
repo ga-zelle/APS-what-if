@@ -18,7 +18,8 @@ from emulator_core import log_msg, sub_issue
 from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 def get_version_GUI(echo_msg):
-    echo_msg['emulator_GUI.py'] = '2024-04-25 16:24'
+    echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
+    #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
     return echo_msg
 
 
@@ -460,13 +461,13 @@ chkrange = ttk.Checkbutton(isf_frame, text='Show range', \
             command=userangeChanged, variable=userange, onvalue='on', offvalue='off')
 chkrange.grid(column=0, row=8, columnspan=2, sticky=(W), padx=5)
 
-def usebestslopeChanged():   act(usebestslope.get(), "bestslope")
+def usebestslopeChanged():   act(usebestslope.get(), "bestSlope")
 usebestslope = StringVar()
 chkbestslope = ttk.Checkbutton(isf_frame, text='Show best slope', \
             command=usebestslopeChanged, variable=usebestslope, onvalue='on', offvalue='off')
 chkbestslope.grid(column=0, row=9, columnspan=2, sticky=(W), padx=5)
 
-def usefitsslopeChanged():   act(usefitsslope.get(), "fitsslope")
+def usefitsslopeChanged():   act(usefitsslope.get(), "fitsSlope")
 usefitsslope = StringVar()
 chkfitsslope = ttk.Checkbutton(isf_frame, text='Show other slopes', \
             command=usefitsslopeChanged, variable=usefitsslope, onvalue='on', offvalue='off')

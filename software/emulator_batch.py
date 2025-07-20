@@ -76,7 +76,7 @@ def dialog1(Title, btns, default_btn, items, default_item):
 def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
     #E started 05.Nov.2019
     if arg == 'Z':                              # no entry found for SMB loop
-        waitSec = loopInterval + 10             # this shoud include at leat 1 loop
+        waitSec = loopInterval + 5              # this shoud include at leat 1 loop
     else:
         loophh = eval('1'+arg[0:2]) - 100       # handle leading '0'
         loopmm = eval('1'+arg[3:5]) - 100       # handle leading '0'
@@ -89,12 +89,14 @@ def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss o
         if now_hh<loophh:
             now_hh = 24                         # past midnight
         nowSec = now_hh*3600 + now_mm*60 + now_ss
-        waitSec = LoopSec + loopInterval + 10 - nowSec   # until next loop including 10 secs spare
+        waitSec = round(LoopSec - nowSec + loopInterval + 5, 0)    # until next loop including 5 secs spare
         if waitSec<10:
-            waitSec = 60                        # was even negative sometimes
-    then = datetime.now() + timedelta(seconds=waitSec)
-    thenStr = format(then, '%H:%M:%s')
-    print ('Waiting ' + str(waitSec) + 'sec for next loop at '+ thenStr[:8] + ';   Variant "' + varName + '"', end='\r')
+            #print('inside wait:', str(waitSec))
+            waitSec = 60 + 5                    # was even negative sometimes
+    then = datetime.now() + timedelta(seconds=waitSec-5)
+    thenStr = format(then, '%H:%M:%S')
+    waitSecStr = str(round(waitSec, 0))[:-2]    # drop the ".0"
+    print (' Waiting ' + waitSecStr + ' sec for next loop at '+ thenStr + ';   Variant "' + varName + '"', end='\r')
     return waitSec
 
 def alarmHours(titel):

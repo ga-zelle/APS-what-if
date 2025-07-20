@@ -10,7 +10,8 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2025-05-05 04:01'         ### de-activate steps debug statement
+    echo_msg['determine_basal.py'] = '2025-07-18 15:36'         ### drift_ISF prototype
+    #cho_msg['determine_basal.py'] = '2025-05-05 04:01'         ### de-activate steps debug statement
     #cho_msg['determine_basal.py'] = '2025-05-03 17:36'         ### extension for calibration transition
     #cho_msg['determine_basal.py'] = '2025-04-20 01:04'         ### extension for state automation
     return echo_msg
@@ -426,6 +427,7 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
     emulAI_ratio.append(10.0)                                   # in case nothing changed
     Fcasts['BZ_ISF'] = 1                #profile['sens'] 
     Fcasts['Delta_ISF'] = 1             #profile['sens']  
+    Fcasts['drift_ISF'] = 1             #profile['sens']  
     Fcasts['pp_ISF'] = 1                #profile['sens']  
     Fcasts['acceISF'] = 1               #profile['sens']  
     Fcasts['dura_ISF'] = 1              #profile['sens']  
@@ -465,6 +467,7 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
     sens_modified = False
     pp_ISF = 1                                                  # mod 14f
     delta_ISF = 1                                               # mod 14f
+    drift_ISF = 1                                               # mod 14f
     acce_ISF = 1                                                # mod 14j
     acce_weight = 1
     bg_off = target_bg+10 - glucose_status['glucose']           # move from central BG=100 to target+10 as virtual BG'=100
@@ -584,6 +587,18 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
     if (delta_ISF != 1) :
         sens_modified = True
 
+    driftWeight = profile['drift_ISF_weight'] 
+    driftDur = glucose_status['lin_fit_minutes']
+    driftSlope = glucose_status['lin_fit_a1']
+    if driftSlope > 0.0:
+        drift_ISF += driftWeight * driftDur/60 * driftSlope
+    Fcasts['drift_ISF'] = drift_ISF
+    if (drift_ISF == 1) :
+        console_error("drift_ISF is 1")
+    else:
+        console_error("drift_ISF adaptation is", short(round(drift_ISF,2)), "because BG drift lasts for", short(round(driftDur,1)),"m")
+        sens_modified = True
+   
     dura_ISF = 1
     if 'dura_ISF' in new_parameter:
         dura_ISF = new_parameter['dura_ISF']
@@ -611,10 +626,11 @@ def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, cu
     if ( sens_modified ) :
         Fcasts['BZ_ISF'] = bg_ISF                       #profile['sens'] / bg_ISF
         Fcasts['Delta_ISF'] = delta_ISF                 #profile['sens'] / max(delta_ISF, pp_ISF)
+        Fcasts['drift_ISF'] = drift_ISF
         Fcasts['pp_ISF'] = pp_ISF                       #profile['sens']  
         Fcasts['acceISF'] = acce_ISF                    #profile['sens'] / acce_ISF
         Fcasts['dura_ISF'] = dura_ISF                   #profile['sens'] / dura_ISF
-        liftISF = max(dura_ISF, bg_ISF, delta_ISF, acce_ISF, pp_ISF)                                                #// corrected logic on 30.Jan.2022
+        liftISF = max(dura_ISF, bg_ISF, delta_ISF, drift_ISF, acce_ISF, pp_ISF)                                                #// corrected logic on 30.Jan.2022
         if acce_ISF<1 :
             console_error("strongest autoISF factor", short(round(liftISF,2)), "weakened to", short(round(liftISF*acce_ISF,2)), "as bg decelerates already")  #// mod V14j: brakes on for otherwise stronger or stable ISF
             liftISF = liftISF * acce_ISF                                                                            # put the deceleration brakes on
