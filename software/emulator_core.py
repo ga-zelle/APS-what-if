@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-07-20 15:35'       # pilot drift_ISF addon
+    echo_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
     #cho_msg['emulator_core.py'] = '2025-07-09 03:00'       # defaulting calibrationDuration
     #cho_msg['emulator_core.py'] = '2025-06-25 02:58'       # re-enable plotting predictions
     #cho_msg['emulator_core.py'] = '2025-05-26 02:27'       # fit table output for Qpython+; fix logfile close error
@@ -2701,7 +2701,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 #    r_list += f'{round(emulAI_ratio[iFrame]/10,2):>4}'     # was scaled up for plotting
                 if featured('range'):
                     r_list += f'{longDelta[iFrame]:>6}{avgDelta[iFrame]:>7}'
-                if featured('fitsslope') or featured('bestslope'):
+                if featured('fitsSlope') or featured('bestSlope'):
                     r_list += f'{longSlope[iFrame]:>7}{rateSlope[iFrame]:>6}'
                 if featured('fitsParabola') or featured('bestParabola'):
                     this_List = 23*' '
@@ -2751,7 +2751,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         
         head1 += "; auto; final; dura;     ; lin.fit; "
         head2 += "; sens;  ISF; min-; dura ;  min-  ; lin.fit"
-        head3 += "; orig; orig; utes; avg. ;  utes  ; delta"
+        head3 += "; orig; orig; utes; avg. ;  utes  ; avg-Δ"
         
         head1 += ";  parab; parab;  parab; parab"
         head2 += ";   fit ;  fit ;  fit ;   fit"
@@ -2968,10 +2968,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         #    head2 += '  orig emul'
         if featured('range'):                           # 13
             head1 += '  --5% range-'
-            head2 += '  dura   avg.'
-        if featured('fitsslope') or featured('bestslope'):                           # 13
+            head2 += '  mins   avg.'
+        if featured('fitsSlope') or featured('bestSlope'):                           # 13
             head1 += '   --lin.fit-'
-            head2 += '   dura  rate'
+            head2 += '   mins avg-Δ'
         if featured('fitsParabola') or featured('bestParabola'):                     # 21
             head1 += '   ----parabola fit----'
             head2 += '   dura  last-Δ  next-Δ'
