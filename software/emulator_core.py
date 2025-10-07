@@ -23,7 +23,8 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
+    echo_msg['emulator_core.py'] = '2025-10-07 14:30'       # key words for Glucose Status changed in logfile
+    #cho_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
     #cho_msg['emulator_core.py'] = '2025-07-09 03:00'       # defaulting calibrationDuration
     #cho_msg['emulator_core.py'] = '2025-06-25 02:58'       # re-enable plotting predictions
     #cho_msg['emulator_core.py'] = '2025-05-26 02:27'       # fit table output for Qpython+; fix logfile close error
@@ -1026,12 +1027,22 @@ def featured(Option):
     return OK
 
 def get_glucose_status(lcount, st) :                    # key = 80
-    key = 'GlucoseStatus'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
-    else:
-        Curly = st[16:]
+    key = 'GlucoseStatusAutoIsf'
+    wo = st.find('(')
+    if wo>0:        # APS3.3.3.0-dev-b after separating out the parabola fit?
+        Curly= st[wo:]
+    #else:
+    #    key = 'GlucoseStatusJson'
+    #    wo = st.find(key)
+    #    if wo>0:        # APS3.3-dev format
+    #        Curly= st[wo+len(key):]
+    #    else:
+    #        key = 'GlucoseStatus'
+    #        wo = st.find(key)
+    #        if wo>0:        # APS3.3-dev format
+    #            Curly= st[wo+len(key):]
+    #        else:           
+    #            Curly = st[16:]
     global glucose_status
     global bg, bgTime, deltas
     global newLoop
@@ -1150,6 +1161,7 @@ def get_iob_data(lcount, st, log, stampStr) :           # key = 81
     iob_data = {}
     iob_data['typeof']  = 'dummy'                       # may be anything
     # get first record as current iob
+    #print(str(lcount), str(iob_array))
     rec_0 = iob_array[0]
     if 'iob' not in rec_0:                  rec_0['iob'] = 0.0
     if 'activity' not in rec_0:             rec_0['activity'] = 0.0
@@ -1433,8 +1445,10 @@ def ConvertSTRINGooDate(stmp) :
          dlst = 3600                                 #    dlst period summer 2024
     elif stmp < "2025-03-30T02:00:00.000Z":
          dlst =    0                                 # no dlst period winter 2024/5
-    else:
+    elif stmp < "2025-10-26T03:00:00.000Z":
          dlst = 3600                                 #    dlst period summer 2025
+    else:
+         dlst = 0                                    # no dlst period winter 2025/6
     MSJahr		= eval(    stmp[ 0:4])
     MSMonat		= eval('1'+stmp[ 5:7]) -100
     MSTag		= eval('1'+stmp[ 8:10])-100

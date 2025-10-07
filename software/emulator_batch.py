@@ -377,7 +377,7 @@ else:                                                                           
         varyHome = os.getcwd()
     varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
-    m +='\n vary_settings home directory  ' + varyHome
+    m +='\n emulator home directory       ' + varyHome
     #global echo_msg
     echo_msg = {}
     echo_msg = get_version_batch(echo_msg)
