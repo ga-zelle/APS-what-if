@@ -1,9 +1,6 @@
-This branch is targeted at AAPS3.3.3.0 and the previously planned release for AAPS3.3.2 version is discontinued.
-The emulator documentation is not yet updated. Major changes are:
-- include the AAPS 3.2.0.4 capabilities
-- support for AAPS 3.3.3.x version
-- include recent big fixes from AutoISF version 3.0.3
-- include the new autoISF3.1.0 capabilities
+This branch is targeted at AAPS3.3.3.0 and the next version 3.2.0 of AutoISF. So far, changes are:
+- updated to read the new iob data record from latest AAPS SMB and AUTOISF plugins
+- include day light savings info for winter 2025/6
 
 This branch is not yet fully tested and may contain bugs. In such cases please contact ga-zelle.
 
