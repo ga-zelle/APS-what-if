@@ -12,9 +12,19 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2025-05-27 14:00'      # fit table output for Qpython+; adapt VDF home
+    echo_msg['emulator_batch.py'] = '2025-12-28 16:30'      # pause in announcing carbs required
+    #cho_msg['emulator_batch.py'] = '2025-05-27 14:00'      # fit table output for Qpython+; adapt VDF home
     #cho_msg['emulator_batch.py'] = '2025-04-09 03:18'      # Logdir geändert
     return echo_msg
+
+if sys.platform == "linux":
+    bashrc = os.path.expanduser("~/.bashrc")
+    line = "export PYTHONUTF8=1\n"
+
+    with open(bashrc, "a") as f:
+        f.write("\n" + line)
+
+    print("PYTHONUTF8=1 toegevoegd aan ~/.bashrc")
 
 def mydialog(title,buttons=["OK"],items=[],multi=False,default_pick=[0,1]):
     # adapted from "https://stackoverflow.com/questions/51874555/qpython3-and-androidhelper-droid-dialogsetsinglechoiceitems"
@@ -73,7 +83,7 @@ def dialog1(Title, btns, default_btn, items, default_item):
             pass
 
 
-def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
+def waitNextLoop(loopInterval, arg,varName):    # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
     #E started 05.Nov.2019
     if arg == 'Z':                              # no entry found for SMB loop
         waitSec = loopInterval + 5              # this shoud include at leat 1 loop
@@ -95,7 +105,8 @@ def waitNextLoop(loopInterval, arg,varName):                  # arg = hh:mm:ss o
             waitSec = 60 + 5                    # was even negative sometimes
     then = datetime.now() + timedelta(seconds=waitSec-5)
     thenStr = format(then, '%H:%M:%S')
-    waitSecStr = str(round(waitSec, 0))[:-2]    # drop the ".0"
+    waitSecStr = str(round(waitSec, 0))
+    if waitSecStr[-2:] == '.0':     waitSecStr = waitSecStr[:-2]  # drop trailing ".0"
     print (' Waiting ' + waitSecStr + ' sec for next loop at '+ thenStr + ';   Variant "' + varName + '"', end='\r')
     return waitSec
 
@@ -116,14 +127,6 @@ def alarmHours(titel):
         elif pressed_button == 1:           sys.exit()                      # EXIT
     return pick
 
-#def echo_version(mdl):
-#    global echo_msg
-#    #mdl= 'vary_settings_batch.py'
-#    stamp = os.stat(varyHome + mdl)
-#    stposx= datetime.fromtimestamp(stamp.st_mtime)
-#    ststr = datetime.strftime(stposx, "%Y-%m-%d %H:%M:%S")
-#    echo_msg[ststr] = mdl
-#    return 
 
 ###############################################
 ###    start of main                        ###
@@ -377,7 +380,7 @@ else:                                                                           
         varyHome = os.getcwd()
     varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
-    m +='\n vary_settings home directory  ' + varyHome
+    m += '\n emulator home directory       ' + varyHome
     #global echo_msg
     echo_msg = {}
     echo_msg = get_version_batch(echo_msg)
@@ -424,9 +427,11 @@ else:                                                                           
 wdhl = 'yes'
 entries = {}
 lastTime = '0'
+pauseCarbsReqEnds = datetime(1970, 1, 1, 0, 0, 0)
+
 while wdhl[0]=='y':                                                                 # use CANCEL to stop/exit
     # All command line arguments known, go for main process
-    loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal)
+    loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first, pauseCarbsReqEnds = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal, pauseCarbsReqEnds)
     if thisTime == 'SYNTAX':        break                                           # problem in VDF file
     if thisTime == 'UTF8':          break                                           # PATHONUTF8 nor defined or incorrect
     #print('returned vary_ISF_batch:', CarbReqGram, ' minutes:',  CarbReqTime)
@@ -439,12 +444,12 @@ while wdhl[0]=='y':                                                             
         val_lastCOB = eval(str(lastCOB)+'+0')
         #print("Zeitslot:", thisInt, str(pickExtraCarbs))
         #print("extra carbs", str(thisInt in pickExtraCarbs), valGram, str(lastCOB))
-        if (thisInt in pickExtraCarbs) and valGram !=0 and valGram-val_lastCOB>6:  # only report if min 0,5 BE missing
+        if (thisInt in pickExtraCarbs or -1 in pickExtraCarbs) and valGram != 0 and valGram - val_lastCOB > 6:  # only report if min 0,5 BE missing
             AlarmTime = CarbReqTime
             valTime = eval(AlarmTime)
             #valGram = eval(AlarmGram)
             signif  = valTime / valGram
-            if signif<5 and thisTime>lastTime:                                      # above threshold of significance
+            if signif<5 and thisTime>lastTime and thisHour>=pauseCarbsReqEnds:      # above threshold of significance
                 #pint(both_ansage, carb_ansage0)
                 droid.ttsSpeak(both_ansage)
                 droid.ttsSpeak(carb_ansage0)
@@ -466,4 +471,3 @@ while wdhl[0]=='y':                                                             
     else:   break                                                                   # on Windows run only once
 
 sys.exit()
-

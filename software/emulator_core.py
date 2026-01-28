@@ -7,23 +7,35 @@
 #   - adapted from scanAPSlog.py
 
 from email.utils import formatdate
-from decimal import *
 from datetime import timezone
 import  datetime
-import  os, subprocess, sys
+import  sys
 import  glob
 import  time
-import  json
 import  zipfile
-import  binascii
 import  copy
 import  re
+import os
+import json
 
 import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
+# Parser debug logging (set to True to enable)
+parser_debug = True
+parser_debug_file = '/tmp/emulator_parser_debug.log'
+
+def parser_debug_log(msg: str):
+    try:
+        with open(parser_debug_file, 'a') as pd:
+            pd.write(formatdate(localtime=True) + ' ' + msg + '\n')
+    except Exception:
+        pass
+
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
+    echo_msg['emulator_core.py'] = '2026-01-02 12:50'       # inherit pause from AAPS in announcing carbs required
+    #cho_msg['emulator_core.py'] = '2025-10-07 14:30'       # key words for Glucose Status changed in logfile
+    #cho_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
     #cho_msg['emulator_core.py'] = '2025-07-09 03:00'       # defaulting calibrationDuration
     #cho_msg['emulator_core.py'] = '2025-06-25 02:58'       # re-enable plotting predictions
     #cho_msg['emulator_core.py'] = '2025-05-26 02:27'       # fit table output for Qpython+; fix logfile close error
@@ -87,6 +99,60 @@ def GetUnquotedStr(Curly, Ab, Key):
         #print (str(wo), str(bis))
     return Found 
 
+
+def getReason(reason: str, key: str, upto: str, offset: int):
+    """Extract a numeric/expression fragment from `reason`.
+
+    This is a defensive implementation used when log `reason` strings
+    vary in formatting. It tries several heuristics and returns an
+    empty string when nothing sensible is found.
+    Parameters:
+    - reason: source string
+    - key: substring to locate
+    - upto: delimiter marking the end (may not be present)
+    - offset: optional integer bytes to skip after the key
+    """
+    try:
+        if not reason or not key:
+            return ''
+        idx = reason.find(key)
+        if idx < 0:
+            return ''
+        start = idx + len(key) + (int(offset) if isinstance(offset, int) else 0)
+        if start < 0:
+            start = idx + len(key)
+        # find end delimiter
+        end = reason.find(upto, start)
+        if end == -1:
+            end = min(len(reason), start + 80)
+        substr = reason[start:end]
+        # try to find a simple numeric literal first
+        m = re.search(r'[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?', substr)
+        if m:
+            return m.group(0).strip()
+        # try to find an arithmetic/expression-like fragment (digits/operators/space)
+        m2 = re.search(r'[\d\.\+\-\*/\(\)\s]+', substr)
+        if m2:
+            return m2.group(0).strip()
+        # fallback to trimmed substring
+        return substr.strip()
+    except Exception:
+        return ''
+
+def sanitize_vdf_expr(expr: str) -> str:
+    """Sanitize VDF expression before eval.
+
+    Transforms unquoted dict-key bracket syntax like `profile[min_bg]`
+    into `profile['min_bg']` so it can be evaluated when `min_bg` is
+    intended as a literal key rather than a Python variable.
+    Leaves numeric indices and already-quoted keys alone.
+    """
+    try:
+        return re.sub(r"(\b[A-Za-z_][A-Za-z0-9_]*)\s*\[\s*([A-Za-z_][A-Za-z0-9_]*)\s*\]",
+                      r"\1['\2']", expr)
+    except Exception:
+        return expr
+
 def printBool(treat, key, log):
     if 'isSMB' in treat:        isSMB = treat[key]
     else:                       isSMB = False
@@ -106,61 +172,69 @@ def printStr(treat, key, log):
 def printVal(treat, key, log):
     log.write('  ' + (key+'    ')[:6] + '=' + str(treat[key]) + '\n')
 
-def getReason(reason, keyword, ending, dezi):
-    wo_key = reason.find(keyword)
-    #print (wo_key, reason + '\n')
-    if wo_key < 0:
-        #print (keyword , 'nicht gefunden')
-        return ''
-    else:
-        wo_com = reason[wo_key+len(keyword)+1:].find(ending) + wo_key+len(keyword)+1
-        #print (reason[wo_key:])
-        key_str = reason[wo_key+len(keyword):wo_com]
-        #print ('complete-->', keyword, '['+key_str+']')
-        #key_str = key_str[:-1]
-        #print ('  capped-->', keyword, '['+key_str+']')
-        return key_str
+def checkCarbsNeeded(curly: str, line_number: int):
+    """Extract carb recommendations from a JSON reason block."""
 
-def checkCarbsNeeded(Curly, lcount):
-    #global entries
-    global  CarbReqGram, CarbReqTime, lastCOB
-    #print('entered "checkCarbsNeeded" in row '+str(lcount)+' with \n'+Curly)
+    global CarbReqGram, CarbReqTime, lastCOB
+
+    # Handle zip-related apostrophe stripping
     if isZip:
-        wo_apo = Curly.find("\'")
-        if wo_apo>0:
-            Curly = Curly[:wo_apo-1]+Curly[wo_apo:]
-            #print("found \' at position "+str(wo_apo)+"\n" +Curly)
-    result = json.loads(Curly)
-    if 'reason' not in result:                                          # error like "could not calculate eventualBG"
+        quote_pos = curly.find("'")
+        if quote_pos > 0:
+            curly = curly[:quote_pos - 1] + curly[quote_pos:]
+
+    # Load JSON safely
+    try:
+        result = json.loads(curly)
+    except json.JSONDecodeError:
         CarbReqTime = ''
         CarbReqGram = ''
-        return                                
-    if result['reason'][:10] == 'Error: CGM':                           # like no CGM while loading transmitter
+        return
+
+    # If "reason" is missing → nothing to calculate
+    if "reason" not in result:
         CarbReqTime = ''
         CarbReqGram = ''
-        return                                
-    stmp = result['deliverAt']                                          # incl milliseconds
-    thisTime = ConvertSTRINGooDate(stmp)
-    if True:    #thisTime not in entries:
-        r_list = {}                                                     # restart with empty list
-        reason = result['reason']
-        lastCOB= result['COB']
-        CarbReqKey            =                   "add'l carbs req w\/in"
-        CarbReqTime           = getReason(reason, CarbReqKey,        'm', 0)
-        if CarbReqTime == '':
-            CarbReqKey        =                   "add'l carbs req w/in"# other spelling
-            CarbReqTime       = getReason(reason, CarbReqKey,        'm', 0)
-        if CarbReqTime == '':
-            CarbReqGram = ''
-        else:
-            wo_carb = reason.find(CarbReqKey)
-            wo_gram = reason[wo_carb-5:].find(' ') + wo_carb-5          # last BLANK before
-            CarbReqGram = reason[wo_gram+1:wo_carb-1]
-        #r_list['CarbReqGram'] = CarbReqGram
-        #r_list['CarbReqTime'] = CarbReqTime
-        #entries[thisTime] = r_list
-    #print('leaving "check ..." with '+CarbReqGram+'g in', CarbReqTime+'min\n')
-    pass
+        return
+
+    reason = result["reason"]
+
+    # Ignore CGM error states
+    if reason.startswith("Error: CGM"):
+        CarbReqTime = ''
+        CarbReqGram = ''
+        return
+
+    # Convert timestamp
+    timestamp = result.get("deliverAt", "")
+    this_time = ConvertSTRINGooDate(timestamp)
+
+    # Reset state
+    CarbReqGram = ''
+    CarbReqTime = ''
+    lastCOB = result.get("COB", '')
+
+    # Two possible key spellings seen in AAPS/Nightscout
+    carb_keys = [
+        "add'l carbs req w/in",
+        "add'l carbs req w/in"  # if later another spelling exists, add here
+    ]
+
+    # Try each key variant
+    for key in carb_keys:
+        CarbReqTime = getReason(reason, key, 'm', 0)
+        if CarbReqTime:  # found match
+            # Extract grams (characters between blank → key)
+            key_pos = reason.find(key)
+            if key_pos > 0:
+                before = reason[key_pos - 5:key_pos]
+                # last space in this slice
+                space_pos = before.rfind(' ')
+                if space_pos != -1:
+                    CarbReqGram = before[space_pos + 1:].strip()
+            break
+
+    return
 
 def basalFromReason(smb, lcount):
     #print('\nrow', str(lcount), str(smb))
@@ -526,13 +600,14 @@ def setVariant(stmp):
 
             logmsg = 'appended new entry to'
             validRow = True
+            myVal_eval = sanitize_vdf_expr(myVal)
             if   myArray == 'state' :                                               # allow also string type assignments
                 if myItem in state :
                     logmsg = 'edited old value of '+str(state[myItem])+' in'
                 if myVal[0] == '"' :
                     state[myItem] =      myVal[1:-1]                                # string variable
                 else:
-                    state[myItem] = eval(myVal)                                     # normal case of numeric or booolean variable
+                    state[myItem] = eval(myVal_eval)                                     # normal case of numeric or booolean variable
                 logres = str(state[myItem])
             elif myArray == 'new_parameter' :                                       # allow also string type assignments like "<V2.7"
                 if myItem in new_parameter :
@@ -540,7 +615,7 @@ def setVariant(stmp):
                 if myVal[0] == '"' :
                     new_parameter[myItem] =      myVal[1:-1]                        # string variable
                 else:
-                    new_parameter[myItem] = eval(myVal)                             # normal case of numeric or booolean variable
+                    new_parameter[myItem] = eval(myVal_eval)                             # normal case of numeric or booolean variable
                 logres = str(new_parameter[myItem])
                 #if myItem == 'FSL_min_dur' and stmp=='1900-01-01T00:00:00':
                 pass
@@ -549,55 +624,55 @@ def setVariant(stmp):
             if   myArray == 'autosens_data' :
                 if myItem in autosens_data :
                     logmsg = 'edited old value of '+str(autosens_data[myItem])+' in'
-                autosens_data[myItem] = eval(myVal)
+                autosens_data[myItem] = eval(myVal_eval)
                 logres = str(autosens_data[myItem])
             elif myArray == 'glucose_status' :
                 if myItem in glucose_status :
                     logmsg = 'edited old value of '+str(glucose_status[myItem])+' in'
-                glucose_status[myItem] = eval(myVal)
+                glucose_status[myItem] = eval(myVal_eval)
                 logres = str(glucose_status[myItem])
             elif myArray == 'currenttemp' :
                 if myItem in currenttemp :
                     logmsg = 'edited old value of '+str(currenttemp[myItem])+' in'
-                currenttemp[myItem] = eval(myVal)
+                currenttemp[myItem] = eval(myVal_eval)
                 logres = str(currenttemp[myItem])
             elif myArray == 'iob_data' :
                 if myItem in iob_data :
                     logmsg = 'edited old value of '+str(iob_data[myItem])+' in'
-                iob_data[myItem] = eval(myVal)
+                iob_data[myItem] = eval(myVal_eval)
                 logres = str(iob_data[myItem])
             elif myArray == 'meal_data' :
                 if myItem in meal_data :
                     logmsg = 'edited old value of '+str(meal_data[myItem])+' in'
-                meal_data[myItem] = eval(myVal)
+                meal_data[myItem] = eval(myVal_eval)
                 logres = str(meal_data[myItem])
             elif myArray == 'profile' :
                 if myItem in profile :
                     logmsg = 'edited old value of '+str(profile[myItem])+' in'
-                profile[myItem] = eval(myVal)
+                profile[myItem] = eval(myVal_eval)
                 logres = str(profile[myItem])
             elif myArray == 'temp' :
                 if myItem in temp :
                     logmsg = 'edited old value of '+str(temp[myItem])+' in'
-                temp[myItem] = eval(myVal)
+                temp[myItem] = eval(myVal_eval)
                 logres = str(temp[myItem])
             elif myArray == 'STAIR' :
-                STAIR[myItem] = eval(myVal)
+                STAIR[myItem] = eval(myVal_eval)
                 logres = myVal
             elif myArray == 'STAIR_BAS' :
-                STAIR_BAS[myItem] = eval(myVal)
+                STAIR_BAS[myItem] = eval(myVal_eval)
                 logres = myVal
             elif myArray == 'STAIR_CR' :
-                STAIR_CR[myItem] = eval(myVal)
+                STAIR_CR[myItem] = eval(myVal_eval)
                 logres = myVal
             elif myArray == 'STAIR_ISF' :
-                STAIR_ISF[myItem] = eval(myVal)
+                STAIR_ISF[myItem] = eval(myVal_eval)
                 logres = myVal
             elif myArray == 'STAIR_LTG' :
-                STAIR_LTG[myItem] = eval(myVal)
+                STAIR_LTG[myItem] = eval(myVal_eval)
                 logres = myVal
             elif myArray == 'STAIR_HTG' :
-                STAIR_HTG[myItem] = eval(myVal)
+                STAIR_HTG[myItem] = eval(myVal_eval)
                 logres = myVal
             elif myArray == 'INTERPOL' :
                 if len(myItem) < 24:                                          # incomplete UTC time label
@@ -793,7 +868,7 @@ def TreatLoop(Curly, log, lcount, fn):
         bgTimeMap[loop_mills[-1]] = bgTime[-1]                      # bgTime used by loop at thisTime
         if 'insulinReq' in suggest:
             key = 'insulinReq'
-            ins_Req = suggest[key]
+            ins_Req = suggest.get(key, 0)
             #if str(ins_Req) == 'None':      ins_Req = 0
             #print('\n\n  ' + (key+'    ')[:6] + '=' + str(ins_Req) + '\n\n')
             if ins_Req > 0.0:                            # can be empty string; was >0.2 before
@@ -1026,12 +1101,21 @@ def featured(Option):
     return OK
 
 def get_glucose_status(lcount, st) :                    # key = 80
-    key = 'GlucoseStatus'
-    wo = st.find(key)
-    if wo>0:        # APS3.3-dev format
-        Curly= st[wo+len(key):]
-    else:
-        Curly = st[16:]
+    key = 'GlucoseStatusAutoIsf'
+    wo = st.find('(')
+    if wo>0:        # APS3.3.3.0-dev-b after separating out the parabola fit?
+        Curly= st[wo:]
+    #else:
+    #    key = 'GlucoseStatusJson'
+    #    wo = st.find(key)
+    #    if wo>0:        # APS3.3-dev format
+    #        Curly= st[wo+len(key):]
+    #    else:
+    #        key = 'GlucoseStatus'
+    #        wo = st.find(key)
+    #        if wo>0:        # APS3.3-dev format
+    #            Curly= st[wo+len(key):]
+    #        else:
     global glucose_status
     global bg, bgTime, deltas
     global newLoop
@@ -1407,51 +1491,38 @@ def get_MicroBolusAllowed(lcount, st) :                 # key = 90
     MicroBolusAllowed = (st.find('true') > 16)
     pass
 
-def ConvertSTRINGooDate(stmp) :
-    # stmp is datetime string incl millis, i.e. like "2019-05-22T12:06:48.091Z"
-    if   stmp < "2019-10-27T03:00:00.000Z":
-         dlst = 3600                                 #    dlst period summer 2019
-    elif stmp < "2020-03-29T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2019/20
-    elif stmp < "2020-10-25T03:00:00.000Z":
-         dlst = 3600                                 #    dlst period summer 2020
-    elif stmp < "2021-03-28T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2020/21
-    elif stmp < "2021-10-31T03:00:00.000Z":
-         dlst = 3600                                 #    dlst period summer 2021
-    elif stmp < "2022-03-27T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2021/22
-    elif stmp < "2022-10-30T03:00:00.000Z":
-         dlst = 3600                                 #    dlst period summer 2022
-    elif stmp < "2023-03-26T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2022/23
-    elif stmp < "2023-10-26T03:00:00.000Z":
-         dlst = 3600                                 #    dlst period summer 2023
-    elif stmp < "2024-03-31T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2023/24
-    elif stmp < "2024-10-27T03:00:00.000Z":
-         dlst = 3600                                 #    dlst period summer 2024
-    elif stmp < "2025-03-30T02:00:00.000Z":
-         dlst =    0                                 # no dlst period winter 2024/5
-    else:
-         dlst = 3600                                 #    dlst period summer 2025
-    MSJahr		= eval(    stmp[ 0:4])
-    MSMonat		= eval('1'+stmp[ 5:7]) -100
-    MSTag		= eval('1'+stmp[ 8:10])-100
-    MSStunde	= eval('1'+stmp[11:13])-100
-    MSMinute	= eval('1'+stmp[14:16])-100
-    MSSekunde	= eval('1'+stmp[17:19])-100
-    if len(stmp)>20:
-        MSmillis = eval('1'+stmp[20:23])-1000   # for SMB mode
-    else:               
-        MSmillis = 0                            # in AMA mode there are no millis
-    #print ('aus', stmp, ' wird', str(MSJahr), str(MSMonat), str(MSTag), str(MSStunde), str(MSMinute), str(MSSekunde), str(MSmillis))
-    NumericDate= datetime.datetime(MSJahr, MSMonat, MSTag, MSStunde, MSMinute, MSSekunde, MSmillis*1000, timezone.utc)  # keep it in UTC
-    #imestamp = NumericDate.replace(tzinfo=timezone.utc).timestamp() + 3600 # 1h MEZ offset
-    #print('entered Convert.. with stmp='+stmp+'\n  NumericDate='+str(NumericDate))
-    timestamp = int( (NumericDate.timestamp() + 3600*0 + dlst*0) * 1000 )       # keep it in UTC; was 1h MEZ offset
-    #print("Eingang: " + stmp + "\nAusgang: " + str(timestamp) )
-    return timestamp
+def ConvertSTRINGooDate(stmp: str) -> int:
+    """
+    Converts a Nightscout datetime string (ISO format, incl. milliseconds)
+    into a UTC timestamp in milliseconds.
+    
+    Example input:
+        "2019-05-22T12:06:48.091Z"
+    """
+
+    if not stmp:
+        return 0
+
+    # Remove trailing Z if present
+    if stmp.endswith("Z"):
+        stmp = stmp[:-1]
+
+    # Parse ISO format with optional milliseconds
+    try:
+        if "." in stmp:
+            dt = datetime.datetime.strptime(stmp, "%Y-%m-%dT%H:%M:%S.%f")
+        else:
+            dt = datetime.datetime.strptime(stmp, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return 0
+
+    # Convert to UTC (Nightscout timestamps are always UTC)
+    dt = dt.replace(tzinfo=timezone.utc)
+
+    # Convert to milliseconds since epoch
+    timestamp_ms = int(dt.timestamp() * 1000)
+
+    return timestamp_ms
 
 def scanLogfile(fn, entries):
     global SMBreason
@@ -1533,12 +1604,25 @@ def scanLogfile(fn, entries):
                 sequenceBLANK = 0               # needed for AIMI
                 
             lcount +=  1
-            #print(zeile)
+            # print(zeile)
+            if parser_debug:
+                try:
+                    snippet = zeile.strip().replace('\n','\\n')
+                    if len(snippet) > 300:
+                        snippet = snippet[:300] + '...'
+                    parser_debug_log(f"LINE {lcount}: isZip={isZip} preview={snippet}")
+                except Exception:
+                    pass
             if lcount>100000:  
                 sub_issue('no end found at row '+str(lcount)+ ' reading /'+zeile+'/')
                 return 'STOP'
             if len(zeile)>13:
                 headerKey = zeile[2] + zeile[5] + zeile[8] + zeile[12]
+                if parser_debug:
+                    try:
+                        parser_debug_log(f"LINE {lcount}: headerKey={headerKey}")
+                    except Exception:
+                        pass
                 if headerKey == '::. ':
                     sLine = zeile[13:]
                     Action = hole(sLine, 0, '[', ']')
@@ -1633,6 +1717,8 @@ def scanLogfile(fn, entries):
                         getStateValue(Curly)
                     elif zeile.find(']: Calibration json') > 0 :
                         getCalibrationJson(zeile[zeile.find('{'):], lcount)           # drop <CR> ?
+                    elif zeile.find(']: CarbSuggestion disabled until ') > 0:
+                        pauseCarbsReq(zeile[zeile.find('until ') + 6:], lcount)
                     #elif lcount>1400 and lcount<2000:   print('no match in row'+str(lcount)+':', Block2)
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
@@ -1651,6 +1737,24 @@ def scanLogfile(fn, entries):
     except:
         time.sleep(10)                          # wait for zip conversion
     return cont
+
+def pauseCarbsReq(Curly, lcount):
+    global pauseCarbsReqEnds
+    strCarbsReqEnds = Curly[:-1]  # mind the trailing CR
+    # print('eingang: {'+strCarbsReqEnds+'}')
+    if strCarbsReqEnds[1] in ['/', '.']:    strCarbsReqEnds = '0' + strCarbsReqEnds  # make it zero padded
+    # print('mittig : {'+strCarbsReqEnds+'}')
+    if strCarbsReqEnds[4] in ['/', '.']:    strCarbsReqEnds = strCarbsReqEnds[:3] + '0' + strCarbsReqEnds[
+        3:]  # make it zero padded
+    # print('ausgang: {'+strCarbsReqEnds+'}')
+    formatFlag = strCarbsReqEnds[2]
+    if formatFlag == "/":
+        formatString = "%m/%d/%y %H:%M:%S"
+    else:
+        formatString = "%d.%m.%y %H:%M:%S"
+    pauseCarbsReqEnds = datetime.datetime.strptime(strCarbsReqEnds, formatString)
+    # print(str(lcount), 'stille Lady bis', str(pauseCarbsReqEnds))
+    pass
 
 def echo_rT(reT):                                       # echo the unusual SMB result
     global emulInsReq
@@ -2437,7 +2541,7 @@ def XYplots(loopCount, head1, head2, entries) :
         #pdf.close()                                        # not needed due to "with ..." method triggered above
     pass
 
-def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries, msg, my_dec):
+def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries, msg, my_dec, oldPauseCarbsReqEnds):
     #log_msg('entered parameters_known mit\nmyseek='+myseek+'\narg2='+arg2+'\nvariantFile='+variantFile+'\nstartLabel='+startLabel+'\nstoppLabel='+stoppLabel)
     #   start of top level analysis
     
@@ -2462,7 +2566,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  filecount
     global  t_startLabel, t_stoppLabel
     global  varFile
-    global  CarbReqGram, CarbReqTime, lastCOB
+    global  CarbReqGram, CarbReqTime, lastCOB, pauseCarbsReqEnds
     
     global  isAndroid                               # flag for running on Android
     global  isZip                                   # flag for input file type
@@ -2544,7 +2648,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     else:
         varFile = varFile + '.vdf'
     if setVariant('1900-01-01T00:00:00'):
-        return  60, 'Z', 0, '', '', 0, ''               # prescan to get parabola fit length
+        return  60, 'Z', 0, '', '', 0, '', oldPauseCarbsReqEnds               # prescan to get parabola fit length
 
     #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)#   
     logListe = glob.glob(myseek+myfile, recursive=False)
@@ -2556,10 +2660,10 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         utf8 = os.getenv('PYTHONUTF8', 'undefined')
         if utf8 == 'undefined':
             sub_issue('You need to set the environment variable PYTHONUTF8 first and assign the value 1')
-            return 0, 'UTF8', 0, '', '', 0, ''        # not defined at all
+            return 0, 'UTF8', 0, '', '', 0, '', oldPauseCarbsReqEnds        # not defined at all
         if utf8 != '1':
             sub_issue('Environment variable PYTHONUTF8 has wrong value '+utf8+', must be value 1')
-            return 0, 'UTF8', 0, '', '', 0, ''        # wrong value
+            return 0, 'UTF8', 0, '', '', 0, '', oldPauseCarbsReqEnds        # wrong value
         
     # ---   add sorting info    -----------------------------------
     sorted_fn = {}
@@ -2650,18 +2754,25 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 #if how_to_print=='GUI':
                 #    fn_first_used.set(fn)
                 if not isAndroid:        log_msg ('\n')
+                pauseCarbsReqEnds = datetime.datetime(1970, 1, 1, 0, 0, 0)
+                # print('old:'+str(oldPauseCarbsReqEnds), '  new:'+str(pauseCarbsReqEnds))
+                if oldPauseCarbsReqEnds > pauseCarbsReqEnds:
+                    pauseCarbsReqEnds = oldPauseCarbsReqEnds
+                # else:
+                #    print('defaulting Carbs Req pause', str(pauseCarbsReqEnds))
+                pass
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
             filecount += 1
             if cont == 'SYNTAX':
                 varlog.close()
-                return 0, 'SYNTAX', 0, '', '', 0, ''    # problem in VDF file
+                return 0, 'SYNTAX', 0, '', '', 0, '', oldPauseCarbsReqEnds    # problem in VDF file
             if cont == 'STOP':
                 break                                   # end of time window reached
     
     if filecount == 0 :
         log_msg ('no such logfile: "'+myseek+'"')
-        return 0, 'Z', 0, '', '', 0, ''
+        return 0, 'Z', 0, '', '', 0, '', oldPauseCarbsReqEnds
     loopCount = len(loop_mills)
     if loopCount == 0 :
         log_msg ('\nno entries found in logfile: "'+myseek+'"')
@@ -2940,7 +3051,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     
     if len(entries) == 0:
         sub_issue('\nNo loop data yet in fresh logfile')
-        return 60, 'Z',0, '', '', 0, ''
+        return 60, 'Z',0, '', '', 0, '', oldPauseCarbsReqEnds
     else:
         if featured ('seconds'):
             head1 = '    UTC  '                         # 9
@@ -3045,7 +3156,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if oldTime not in sorted_entries[len(sorted_entries)-top10:]:
             del entries[oldTime]                                        # no longer in last 14 entries
     if loopCount < 2:
-        return 60, 'Z', 0, '', '', 0, ''
+        return 60, 'Z', 0, '', '', 0, '', oldPauseCarbsReqEnds
     else:
         extraSMB = emulSMB[loopCount-1] - origSMB[loopCount-1] 
         #print("origSMB="+str(origSMB)+"\nemulSMB="+str(emulSMB))
@@ -3053,7 +3164,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if loopCount>1:
             #print(str(loopCount), str(loop_mills[-1]), str(loop_mills[0]))
             loopInterval = (loop_mills[-1] - loop_mills[0]) / (loopCount-1) / 1.000     # avg. sec per loop
-        return loopInterval, loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first
+        return loopInterval, loop_label[loopCount-1], round(extraSMB, 1), CarbReqGram, CarbReqTime, lastCOB, fn_first, pauseCarbsReqEnds
 
 def set_tty(printframe, txtbox, channel):                   # for GIU
     global how_to_print
@@ -3084,5 +3195,3 @@ def sub_issue(msg):
         lfd.see('end')
     else:
         print (msg)
-
-#

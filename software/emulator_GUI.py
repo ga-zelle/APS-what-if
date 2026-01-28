@@ -1,4 +1,6 @@
 import  os, sys
+import subprocess
+
 import  glob
 #from Lib import subprocess
 import  contextlib
@@ -17,12 +19,22 @@ from emulator_core import log_msg, sub_issue
 
 from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
+
 def get_version_GUI(echo_msg):
-    echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
+    echo_msg['emulator_GUI.py'] = '2026-01-04 12:00'        # adapt for extra parameter when running on Andriod
+    #cho_msg['emulator_GUI.py'] = '2025-12-25 00:00'        # enable SHOW result on Linux
+    #cho_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
     #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
     return echo_msg
 
+if sys.platform == "linux":
+    bashrc = os.path.expanduser("~/.bashrc")
+    line = "export PYTHONUTF8=1\n"
 
+    with open(bashrc, "a") as f:
+        f.write("\n" + line)
+
+    print("PYTHONUTF8=1 toegevoegd aan ~/.bashrc")
 
 #################################################################################
 #   overall layout                                                              #
@@ -592,77 +604,39 @@ def get_pdffil():
     if newaf != "":
         pdffil.set(newaf)
 
-def edit_logfil():
-    oldvf = logfil.get()
+
+def getFileByOS(oldvf):
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
-    except:                                                                     # catch *all* exceptions
-        book.select(4)                                                          # activate result tab
+        if sys.platform == "win32":
+            os.startfile(oldvf)  # requires DOS knows to edit ".log" files
+        else:
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.call([opener, oldvf])
+    except:  # catch *all* exceptions
+        book.select(4)  # activate result tab
         tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_GUI.py")
+        sub_issue("Problem in emulator_GUI.py")
         for ele in traceback.format_tb(tb):
-            sub_issue(ele[:-1])                                                 # sub appends <CR>
+            sub_issue(ele[:-1])  # sub appends <CR>
         sub_issue(str(sys.exc_info()[1]))
+
+def edit_logfil():
+    getFileByOS(logfil.get())
 
 def edit_deltafil():
-    oldvf = deltafil.get()
-    try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".delta" files
-    except:                                                                     # catch *all* exceptions
-        book.select(4)                                                          # activate result tab
-        tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_GUI.py")
-        for ele in traceback.format_tb(tb):
-            sub_issue(ele[:-1])                                                 # sub appends <CR>
-        sub_issue(str(sys.exc_info()[1]))
+    getFileByOS(deltafil.get())
 
 def edit_tabfil():
-    oldvf = tabfil.get()
-    try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".csv" files
-    except:                                                                     # catch *all* exceptions
-        book.select(4)                                                          # activate result tab
-        tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_GUI.py")
-        for ele in traceback.format_tb(tb):
-            sub_issue(ele[:-1])                                                 # sub appends <CR>
-        sub_issue(str(sys.exc_info()[1]))
+    getFileByOS(tabfil.get())
 
 def edit_txtorig():
-    oldvf = txtorig.get()
-    try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
-    except:                                                                     # catch *all* exceptions
-        book.select(4)                                                          # activate result tab
-        tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_GUI.py")
-        for ele in traceback.format_tb(tb):
-            sub_issue(ele[:-1])                                                 # sub appends <CR>
-        sub_issue(str(sys.exc_info()[1]))
+    getFileByOS(txtorig.get())
 
 def edit_txtemul():
-    oldvf = txtemul.get()
-    try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
-    except:                                                                     # catch *all* exceptions
-        book.select(4)                                                          # activate result tab
-        tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_GUI.py")
-        for ele in traceback.format_tb(tb):
-            sub_issue(ele[:-1])                                                 # sub appends <CR>
-        sub_issue(str(sys.exc_info()[1]))
+    getFileByOS(txtemul.get())
 
 def edit_pdffil():
-    oldvf = pdffil.get()
-    try:
-        os.startfile(oldvf)                                                     # requires DOS knows to open ".pdf" files
-    except:                                                                     # catch *all* exceptions
-        book.select(4)                                                          # activate result tab
-        tb = sys.exc_info()[2]
-        sub_issue("Problem in vary_GUI.py")
-        for ele in traceback.format_tb(tb):
-            sub_issue(ele[:-1])                                                 # sub appends <CR>
-        sub_issue(str(sys.exc_info()[1]))
+    getFileByOS(pdffil.get())
 
 resframe.columnconfigure(0, weight=1)
 resframe.columnconfigure(1, weight=1)
@@ -740,7 +714,7 @@ def sub_emul():
         varyHome = os.getcwd()
     varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
-    m +='\n vary_settings home directory  ' + varyHome
+    m += '\n emulator home directory       ' + varyHome
     global echo_msg
     echo_msg = {}
     echo_msg = get_version_GUI(echo_msg)
@@ -808,7 +782,29 @@ def sub_emul():
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
-        loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+        pauseCarbsReqEnds = datetime(1970, 1, 1, 0, 0, 0)  # only used on Android
+        # _, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+        _raw = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal, pauseCarbsReqEnds)
+
+        if not isinstance(_raw, (list, tuple)):
+            sub_issue(f"parameters_known returned non-iterable: {_raw}")
+            _raw = [_raw]
+
+        _expected = 8
+        _defaults = [0, 'Z', 0, '', '', 0, '', pauseCarbsReqEnds]
+
+        if len(_raw) < _expected:
+            sub_issue(f"parameters_known returned {len(_raw)} values, expected 7. Filling with defaults.")
+            _raw = list(_raw) + _defaults[len(_raw):]
+
+        if len(_raw) > _expected:
+            sub_issue(f"parameters_known returned {len(_raw)} values, ignoring extra values.")
+
+        _raw = _raw[:_expected]
+
+
+        _, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first, pauseCarbsReqEnds = _raw
+
         if thisTime == 'SYNTAX':
             runState.set('Emulation halted ... ')
             ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)

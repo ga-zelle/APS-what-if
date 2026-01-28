@@ -10,7 +10,8 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2025-07-18 15:36'         ### drift_ISF prototype
+    echo_msg['determine_basal.py'] = '2026-01-05 10:50'         ### half-basal_exercise_target allowed in mmol/L
+    #cho_msg['determine_basal.py'] = '2025-07-18 15:36'         ### drift_ISF prototype
     #cho_msg['determine_basal.py'] = '2025-05-05 04:01'         ### de-activate steps debug statement
     #cho_msg['determine_basal.py'] = '2025-05-03 17:36'         ### extension for calibration transition
     #cho_msg['determine_basal.py'] = '2025-04-20 01:04'         ### extension for state automation
@@ -904,23 +905,25 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     exerciseModeActive = (profile['exercise_mode'] or profile['high_temptarget_raises_sensitivity']) and profile['temptargetSet'] and target_bg>normalTarget
     resistanceModeActive = profile['low_temptarget_lowers_sensitivity'] and profile['temptargetSet'] and target_bg < normalTarget
     if  'half_basal_exercise_target' in profile:
-        halfBasalTarget = profile['half_basal_exercise_target']
+        mgdlHalfBasalTarget = profile['half_basal_exercise_target']
+        if profile['autoISF_version'] >= '3.1.0' and profile['out_units'] == 'mmol/L':    mgdlHalfBasalTarget *= 18
     else:
-        halfBasalTarget = 160   #// when temptarget is 160 mg/dL, run 50% basal (120 = 75%; 140 = 60%)
-        #// 80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
+        mgdlHalfBasalTarget = 160  # // when temptarget is 160 mg/dL, run 50% basal (120 = 75%; 140 = 60%)
+        # // 80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
     exercise_ratio = 1
-    if AAPS_Version == '2.7' :
+    if AAPS_Version == '2.7':
         HTToffset = 0
-    else :
+    else:
         HTToffset = 10
-    Flows.append(dict(title="Impact of\ntemptarget("+str(target_bg)+")\non sensitivity ("+str(round(autosens_data['ratio'],2))+")", indent='0', adr='140'))
-    if ( exerciseModeActive or resistanceModeActive or stepActivityDetected or stepInactivityDetected ) :
-        if ( exerciseModeActive or resistanceModeActive ):
-            #// w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44
-            #// e.g.: Sensitivity ratio set to 0.8 based on temp target of 120; Adjusting basal from 1.65 to 1.35; ISF from 58.9 to 73.6
-            #//sensitivityRatio = 2/(2+(target_bg-normalTarget)/40);
+    Flows.append(dict(title="Impact of\ntemptarget(" + str(target_bg) + ")\non sensitivity (" + str(
+        round(autosens_data['ratio'], 2)) + ")", indent='0', adr='140'))
+    if (exerciseModeActive or resistanceModeActive or stepActivityDetected or stepInactivityDetected):
+        if (exerciseModeActive or resistanceModeActive):
+            # // w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44
+            # // e.g.: Sensitivity ratio set to 0.8 based on temp target of 120; Adjusting basal from 1.65 to 1.35; ISF from 58.9 to 73.6
+            # //sensitivityRatio = 2/(2+(target_bg-normalTarget)/40);
             resistanceMax = min(1.5, profile['autosens_max'])
-            c = halfBasalTarget - normalTarget
+            c = mgdlHalfBasalTarget - normalTarget
             if (c * (c + target_bg-normalTarget) <= 0.0) :
                 #// limit sensitivityRatio to profile.autosens_max (1.2x by default)
                 sensitivityRatio = resistanceMax
@@ -2316,4 +2319,3 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         #eturn tempBasalFunctions.setTempBasal(rate, 30, profile, rT, currenttemp)
         Flows.append(dict(title="required temp("+str(rate)+")\n> existing temp("+long2(currenttemp['rate'])+")", indent='0', adr='1140+12'))
         return                    setTempBasal(rate, 30, profile, rT, currenttemp, Flows)
-
