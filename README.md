@@ -1,11 +1,9 @@
-This branch is targeted at AAPS3.3.3.0 and the previously planned release for AAPS3.3.2 version is discontinued.
+This branch is targeted at AAPS3.4.0.0 
 The emulator documentation is not yet updated. Major changes are:
-- include the AAPS 3.2.0.4 capabilities
-- support for AAPS 3.3.3.x version
-- include recent big fixes from AutoISF version 3.0.3
-- include the new autoISF3.1.0 capabilities
+- support for AAPS 3.4.0.0 version
+- include the new autoISF3.2.0 capabilities
 
-This branch is not yet fully tested and may contain bugs. In such cases please contact ga-zelle.
+In case of please contact ga-zelle.
 
 See also the change.log
 
