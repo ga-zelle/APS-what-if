@@ -1,3 +1,9 @@
+28.Jan.2026
+-----------
+Added compatibility for Debian 13 as proposed by Dries
+Added silencing of **x carbs required in y minutes** alarm by adhering to the related pause activation in AAPS
+
+
 05.May.2025
 -----------
 Added handling of planned new AutoISF features
@@ -164,3 +170,4 @@ Debugged / added DLST handling for summer 2019 through to summer 2020 in ME(S)Z 
 Changes Related to variant definition improve checking the success of variant definition process:
  - debugged reporting of new, additional parameters
  - added reporting of ignored instructions
+
