@@ -3,7 +3,7 @@ The emulator documentation is not yet updated. Major changes are:
 - support for AAPS 3.4.0.0 version
 - include the new autoISF3.2.0 capabilities
 
-In case of please contact ga-zelle.
+In case of problems please contact ga-zelle.
 
 See also the change.log
 
