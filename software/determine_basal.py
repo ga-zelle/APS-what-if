@@ -39,7 +39,7 @@ def calculate_expected_delta(target_bg, eventual_bg, bgi):
     return expectedDelta
 
 def convert_bg(value, profile):
-    if ('out_units' in profile and profile['out_units'] == "mmol\/L") :     # escape "\" remained part of string
+    if ('out_units' in profile and profile['out_units'] == "mmol\\/L") :     # escape "\" remained part of string
         return round(value / 18, 1)
     else:
         return round(value, 0)
@@ -251,7 +251,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, thi
         #else :
         #    msgType = "profile target "
 
-        if ('out_units' in profile and profile['out_units'] == "mmol\/L") :
+        if ('out_units' in profile and profile['out_units'] == "mmol\\/L") :
             evenTarget = round(target*10, 0) %2 == 0
             msgUnits   = " has "
             msgTail    = " decimal"
@@ -2034,7 +2034,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 Flows.append(dict(title="Eventual BG(" + str(convert_bg(eventualBG, profile)) + ") > min_bg(" + str(convert_bg(min_bg, profile)) + ")\nbut\nMin. Delta(" + str(round(minDelta,2) )+ ") < Exp. Delta(" + str(short(convert_bg(expectedDelta, profile)))+')', indent='+1', adr='970+1'))
             if (currenttemp['duration'] > 15 and (round_basal(basal, profile) == round_basal(currenttemp['rate'], profile))) :
                 rT['reason'] += ", temp " + str(currenttemp['rate']) + " ~ req " + str(basal) + "U/hr. "
-                Flows.append(dict(title="R E T U R N\currenttemp(" + str(currenttemp['rate']) + ")   \n   ~ req (" + str(basal) + ") U/hr.", indent='+0', adr='974+1'))
+                Flows.append(dict(title="R E T U R N\ncurrenttemp(" + str(currenttemp['rate']) + ")   \n   ~ req (" + str(basal) + ") U/hr.", indent='+0', adr='974+1'))
                 return rT
             else :
                 rT['reason'] += "; setting current basal of " + str(basal) + " as temp. "
@@ -2050,7 +2050,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             rT['reason'] += str(convert_bg(eventualBG, profile))+"-"+str(convert_bg(minPredBG, profile))+" in range: no temp required"
             if (currenttemp['duration'] > 15 and (round_basal(basal, profile) == round_basal(currenttemp['rate'], profile))) :
                 rT['reason'] += ", temp " + str(currenttemp['rate']) + " ~ req " + str(basal) + "U/hr. "
-                Flows.append(dict(title="R E T U R N\nset rate="+str(currenttemp['rate'])+"\durationn="+str(basal), indent='+0', adr='988+1'))
+                Flows.append(dict(title="R E T U R N\nset rate="+str(currenttemp['rate'])+"\nduration="+str(basal), indent='+0', adr='988+1'))
                 return rT
             else :
                 rT['reason'] += "; setting current basal of " + str(basal) + " as temp. "
@@ -2070,7 +2070,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         Flows.append(dict(title="IOB(" + str(round(iob_data['iob'],2)) + ") > max_iob(" + str(max_iob)+")", indent='0', adr='1003+1'))
         if (currenttemp['duration'] > 15 and (round_basal(basal, profile) == round_basal(currenttemp['rate'], profile))) :
             rT['reason'] += ", temp " + str(currenttemp['rate']) + " ~ req " + str(basal) + "U/hr. "
-            Flows.append(dict(title="R E T U R N\nset rate="+str(currenttemp['rate'])+"\durationn="+str(basal), indent='+0', adr='1006+1'))
+            Flows.append(dict(title="R E T U R N\nset rate="+str(currenttemp['rate'])+"\nduration="+str(basal), indent='+0', adr='1006+1'))
             return rT
         else :
             rT['reason'] += "; setting current basal of " + str(basal) + " as temp. "

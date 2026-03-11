@@ -19,7 +19,8 @@ import os
 import json
 
 import determine_basal as detSMB
-from determine_basal import my_ce_file 
+from determine_basal import my_ce_file
+#from emulator_batch import eleList
 
 # Parser debug logging (set to True to enable)
 parser_debug = True
@@ -33,7 +34,8 @@ def parser_debug_log(msg: str):
         pass
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2026-01-02 12:50'       # inherit pause from AAPS in announcing carbs required
+    echo_msg['emulator_core.py'] = '2026-03-10 22:20'       # round parabola fit minutes for aligning interactive table output
+    #cho_msg['emulator_core.py'] = '2026-01-02 12:50'       # inherit pause from AAPS in announcing carbs required
     #cho_msg['emulator_core.py'] = '2025-10-07 14:30'       # key words for Glucose Status changed in logfile
     #cho_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
     #cho_msg['emulator_core.py'] = '2025-07-09 03:00'       # defaulting calibrationDuration
@@ -98,7 +100,6 @@ def GetUnquotedStr(Curly, Ab, Key):
         Found	= Curly[wo+len(Key)+0:bis]
         #print (str(wo), str(bis))
     return Found 
-
 
 def getReason(reason: str, key: str, upto: str, offset: int):
     """Extract a numeric/expression fragment from `reason`.
@@ -688,7 +689,7 @@ def setVariant(stmp):
                 logres = myVal
             elif myArray != 'new_parameter':
                 validRow = False
-                if myArray != '':   varlog.write(myArray + ' is an unrecognised array/json/keyword')
+                if myArray != '':   varlog.write(myArray + ' is an unrecognised array/json/keyword ')
         
             if (stmp != '1900-01-01T00:00:00') :
                 if validRow:    varlog.write(logmsg+' '+myArray+' with '+myItem+'='+logres+'\n')
@@ -1190,6 +1191,15 @@ def get_glucose_status(lcount, st) :                    # key = 80
     #        print('deltas at '+str(mills), str(deltas[mills]))
     pass
 
+def getSpecialDeltas(Curly):
+    global deltaStatus
+    if Curly[-1:] != '}':       Curly += '}'            # incomplete during 7.Jun.2925
+    deltaStatus = json.loads(Curly)
+    #for ele in dJson:
+    #    deltaStatus[ele] = dJson[ele]
+    #print(str(deltaStatus))
+    pass
+
 def get_iob_data(lcount, st, log, stampStr) :           # key = 81
     if not newLoop: return
     global iob_data, utcOffset
@@ -1304,10 +1314,7 @@ def get_currenttemp(lcount, st) :                       # key = 82
 
 def getCalibrationJson(Curly, lcount):
     global calibrationJson
-    #print(fn, fn[-4:], str(lcount))
-    #print('calibration json input='+Curly)
-    if fn[-4:] != '.zip':       Curly = Curly[:-1]      # for non-zipped file 
-    #print('calibration json input='+Curly)
+    if fn[-4:] != '.zip':       Curly = Curly[:-1]      # for non-zipped file
     if Curly[-1:] != '}':       Curly += '}'            # incomplete during 7.Jun.2925
     cal_json = json.loads(Curly)
     for ele in cal_json:
@@ -1719,6 +1726,8 @@ def scanLogfile(fn, entries):
                         getCalibrationJson(zeile[zeile.find('{'):], lcount)           # drop <CR> ?
                     elif zeile.find(']: CarbSuggestion disabled until ') > 0:
                         pauseCarbsReq(zeile[zeile.find('until ') + 6:], lcount)
+                    elif zeile.find(']: detailedDelta json') >0 :
+                        getSpecialDeltas(zeile[zeile.find('{'):])
                     #elif lcount>1400 and lcount<2000:   print('no match in row'+str(lcount)+':', Block2)
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
@@ -2826,7 +2835,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                             thisDelta = deltas[deltaTime]
                             #print('    '+str(thisDelta))
                             if 'parabola_fit_minutes' in thisDelta:
-                                this_List = f'{thisDelta["parabola_fit_minutes"]:>7}{round(thisDelta["parabola_fit_last_delta"],2):>8}'
+                                this_List = f'{round(thisDelta["parabola_fit_minutes"],1):>7}{round(thisDelta["parabola_fit_last_delta"],2):>8}'
                                 this_List+= f'{round(thisDelta["parabola_fit_next_delta"],2):>8}'
                     r_list += this_List
                 #if featured('autosens) or featured('auto'): 
@@ -3031,7 +3040,7 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         for mills in deltas:
             #mills = loop_mills[i]
             i_label = loop_label[i]
-            ll  = f'{i_label:>9}  {round(bgTime[i],0):>10} {bg[i]:>4}'
+            ll  = f'{i_label:>9}  {round(bgTime[i],0):>10} {round(bg[i],0):>4}'
             ll += f'{round(deltas[mills]["delta"],2):>9} {round(deltas[mills]["short"],2):>7} {round(deltas[mills]["long"],2):>7}'
             ll += f'{longSlope[i]:>8}{rateSlope[i]:>6}'
             if 'parabola_fit_minutes' in deltas[mills]:

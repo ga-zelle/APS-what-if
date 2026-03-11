@@ -82,7 +82,6 @@ def dialog1(Title, btns, default_btn, items, default_item):
             #print(binascii.b2a_uu(7))          # bell() ?
             pass
 
-
 def waitNextLoop(loopInterval, arg,varName):    # arg = hh:mm:ss of last loop execution, optionally appended 'Z'
     #E started 05.Nov.2019
     if arg == 'Z':                              # no entry found for SMB loop
@@ -199,8 +198,9 @@ if IsAndroid :
         #elif        pressed_button == "T":     call(['espeak', '-v', language[pick], '-p',pitch, '-s', speed, items[pick]])     # TEST
         
     if   pick == "1":
-        textLessSMB = 'Die neuen Einstellungen hätten weniger Bolus vorgeschlagen, nämlich um '
-        textMoreSMB = 'Die neuen Einstellungen schlagen einen extra Bolus vor, nämlich '
+        textNewSettings = 'Die neuen Einstellungen gemäß der Variante mit dem Namen '
+        textLessSMB = ' hätten weniger Bolus vorgeschlagen, nämlich um '
+        textMoreSMB = ' schlagen einen extra Bolus vor, nämlich '
         textUnit= ' Einheiten'
         both_ansage  = 'Prüf doch Mal die Lage.'
         carb_ansage0 = 'Du brauchst eventuell Kohlenhydrate,'
@@ -210,8 +210,9 @@ if IsAndroid :
         Speak_items = ["Extra Kohlenhydrate", "Extra Bolus", "Zuviel Bolus"]
         Speak_Pick  = "Wähle Ansagen"
     elif pick == "2":
-        textLessSMB = 'the new settings would have suggested less bolus by '
-        textMoreSMB = 'the new settings suggest an extra bolus, namely '
+        textNewSettings = 'The new settings according to the variant called '
+        textLessSMB = ' would have suggested less bolus by '
+        textMoreSMB = ' suggest an extra bolus, namely '
         textUnit= ' units'
         both_ansage  = 'Houston, we may have a situation.'
         carb_ansage0 = 'You may need carbohydrates,'
@@ -407,14 +408,14 @@ else:                                                                           
         t_startLabel = sys.argv[4]                  # first loop time to evaluate#
         m_default = ''
     else:
-        t_startLabel = '2000-00-00T00:00:00Z'       # defaults to start of centuary, i.e. open start
+        t_startLabel = '2000-00-00T00:00:00Z'       # defaults to start of century, i.e. open start
         m_default = ' (default)'
     m += '\nStart of time window  ' + t_startLabel + m_default
     if len(sys.argv)>=6:
         t_stoppLabel = sys.argv[5]                  # last loop time to evaluate
         m_default = ''
     else:
-        t_stoppLabel = '2099-00-00T00:00:00Z'       # defaults to end of centuary, i.e. open end
+        t_stoppLabel = '2099-00-00T00:00:00Z'       # defaults to end of century, i.e. open end
         m_default = ' (default)'
     m += '\nEnd of time window    ' + t_stoppLabel + m_default
     if len(sys.argv)==7:
@@ -433,7 +434,7 @@ while wdhl[0]=='y':                                                             
     # All command line arguments known, go for main process
     loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first, pauseCarbsReqEnds = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal, pauseCarbsReqEnds)
     if thisTime == 'SYNTAX':        break                                           # problem in VDF file
-    if thisTime == 'UTF8':          break                                           # PATHONUTF8 nor defined or incorrect
+    if thisTime == 'UTF8':          break                                           # PATHONUTF8 not defined or incorrect
     #print('returned vary_ISF_batch:', CarbReqGram, ' minutes:',  CarbReqTime)
     if IsAndroid:
         thisHour = datetime.now()
@@ -459,11 +460,11 @@ while wdhl[0]=='y':                                                             
                 #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, both_ansage1 + str(valGram) + carb_ansage2 + AlarmTime + carb_ansage3])
         #print("extra bolus", str(thisInt in pickMoreSMB), str(extraSMB))
         if (thisInt in pickMoreSMB) and extraSMB>0 and thisTime>lastTime:
-            droid.ttsSpeak(textMoreSMB+str(extraSMB)+textUnit)
+            droid.ttsSpeak(textNewSettings+varFile[len(vdf_dir):-4]+textMoreSMB+str(extraSMB)+textUnit)
             #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, textMoreSMB+str(extraSMB)+textUnit])    # wake up user, also during sleep?
         #print("less  bolus", str(thisInt in pickLessSMB), str(extraSMB))
         if (thisInt in pickLessSMB) and extraSMB<0 and thisTime>lastTime:
-            droid.ttsSpeak(textLessSMB+str(extraSMB)+textUnit)
+            droid.ttsSpeak(textNewSettings+varFile[len(vdf_dir):-4]+textLessSMB+str(extraSMB)+textUnit)
             #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, textLessSMB+str(extraSMB)+textUnit])    # wake up user, also during sleep?
         howLong = waitNextLoop(loopInterval, thisTime, varFile[len(vdf_dir):-4])
         lastTime = thisTime        
