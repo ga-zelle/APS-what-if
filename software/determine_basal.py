@@ -10,7 +10,8 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2026-01-05 10:50'         ### half-basal_exercise_target allowed in mmol/L
+    echo_msg['determine_basal.py'] = '2026-11-17 18:00'         ### half-basal_exercise_target fix -not allways- conversion from mmol/L
+    #cho_msg['determine_basal.py'] = '2026-01-05 10:50'         ### half-basal_exercise_target allowed in mmol/L
     #cho_msg['determine_basal.py'] = '2025-07-18 15:36'         ### drift_ISF prototype
     #cho_msg['determine_basal.py'] = '2025-05-05 04:01'         ### de-activate steps debug statement
     #cho_msg['determine_basal.py'] = '2025-05-03 17:36'         ### extension for calibration transition
@@ -421,7 +422,7 @@ def withinISFlimits(liftISF, minISFReduction, maxISFReduction, sensitivityRatio,
     console_error("----------------------------------")
     return final_ISF
 
-def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, thisTime, state, Fcasts, Flows, emulAI_ratio):
+def autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, thisTime, state, Fcasts, Flows, emulAI_ratio, AAPS_VersionString):
     #### gz mod 6: dynamic ISF based on dimensions of 5% band
     #Fcasts['origISF'] = profile['sens']                        # taken from original logfile
     #Fcasts['autoISF'] = sens                                   # as modified by autosense; taken from original logfile
@@ -696,20 +697,42 @@ def activityMonitor(profile, bg, target_bg, thisTime, utcOffset, state):
         key60 = 'recentSteps60Minutes'
     else:
         key05 = 'recent_steps_5_minutes'
+        #print("step counts in profile:", str(profile))
         key10 = 'recent_steps_10_minutes'
         key15 = 'recent_steps_15_minutes'
         key30 = 'recent_steps_30_minutes'
         key60 = 'recent_steps_60_minutes'
             
-    recentSteps5Minutes  = profile[key05]
-    recentSteps10Minutes = profile[key10]
-    recentSteps15Minutes = profile[key15]
-    recentSteps30Minutes = profile[key30]
-    recentSteps60Minutes = profile[key60]
+    if key05 in profile:
+        recentSteps5Minutes  = profile[key05]
+    else:
+        recentSteps05Minutes = 0            # Kotlin skips outputting 0 values
+    if key10 in profile:
+        recentSteps10Minutes =  profile[key10]
+    else:
+        recentSteps10Minutes = 0            # Kotlin skips outputting 0 values
+    if key15 in profile:
+        recentSteps15Minutes = profile[key15]
+    else:
+        recentSteps150Minutes = 0            # Kotlin skips outputting 0 values
+    if key30 in profile:
+        recentSteps30Minutes = profile[key30]
+    else:
+        recentSteps30Minutes = 0            # Kotlin skips outputting 0 values
+    if key60 in profile:
+        recentSteps60Minutes = profile[key60]
+    else:
+        recentSteps60Minutes = 0  # Kotlin skips outputting 0 values
     phoneMoved = profile['phone_moved']
     time_since_start = profile['time_since_start']
-    activity_scale_factor = profile['activity_scale_factor']
-    inactivity_scale_factor = profile['inactivity_scale_factor']
+    if 'activity_scale_factor' in profile:
+        activity_scale_factor = profile['activity_scale_factor']
+    else:
+        activity_scale_factor = 1
+    if 'inactivity_scale_factor' in profile:
+        inactivity_scale_factor = profile['inactivity_scale_factor']
+    else:
+        inactivity_scale_factor = 1
     ignore_inactivity_overnight = profile['ignore_inactivity_overnight']
     inactivity_idle_start = (profile['inactivity_idle_start'] - utcOffset) % 24
     inactivity_idle_end = (profile['inactivity_idle_end'] - utcOffset) % 24
@@ -763,7 +786,7 @@ def activityMonitor(profile, bg, target_bg, thisTime, utcOffset, state):
         #//console_error("end Activity detection")
     return activityRatio
 
-def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, microBolusAllowed, reservoir_data, thisTime, Fcasts, Flows, emulAI_ratio):
+def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, microBolusAllowed, reservoir_data, thisTime, Fcasts, Flows, emulAI_ratio, AAPS_VersionString):
     rT = {} #//short for requestedTemp
 
     deliverAt   = thisTime
@@ -772,13 +795,15 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     Flows.append(dict(title='checking\ninput data sets', indent='0', adr='55'))
         
     #f (typeof (profile) == 'undefined' or typeof (profile.current_basal) == 'undefined'):
-    if (                                   typeof(profile,'current_basal') == 'undefined') :
+    if (typeof(profile,'current_basal') == 'undefined') :
         rT['error'] ='Error: could not get current basal rate'
         return rT
     # unpack the new parameters                                     ###
     if 'new_parameter' in profile:
         new_parameter = profile['new_parameter']                    ###
         AAPS_Version = new_parameter['AAPS_Version']                ### required from 2.7 onwards
+    else:
+        AAPS_Version = '(older)'
     if 'state' in profile:
         state = profile['state']
     
@@ -898,15 +923,18 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     if  gz_proto :  #and profile['exercise_mode']:
         fullBasalTarget = profile['full_basal_exercise_target']
     else :
-        fullBasalTarget = 100       #// when temptarget is 100 mg/dL, run 100% basal
+        if AAPS_VersionString < '3.4.1.0' :
+            fullBasalTarget = 100       # // when temptarget is 100 mg/dL, run 100% basal
+        else:
+            fullBasalTarget = 99        # changed since 3.4.1.0 to accomodate mmol/L users
         #// 80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
-       
-    normalTarget = fullBasalTarget  #// was 100;    // evaluate high/low temptarget against 100, not scheduled basal/target (which might change)
+    #print('gz_proto='+str(gz_proto), 'AAPS='+AAPS_Version, 'fullBasalTarget='+str(fullBasalTarget))
+    normalTarget = fullBasalTarget  #// was 100;    // evaluate high/low temptarget against 100 or 99 not scheduled basal/target (which might change)
     exerciseModeActive = (profile['exercise_mode'] or profile['high_temptarget_raises_sensitivity']) and profile['temptargetSet'] and target_bg>normalTarget
     resistanceModeActive = profile['low_temptarget_lowers_sensitivity'] and profile['temptargetSet'] and target_bg < normalTarget
     if  'half_basal_exercise_target' in profile:
         mgdlHalfBasalTarget = profile['half_basal_exercise_target']
-        if profile['autoISF_version'] >= '3.1.0' and profile['out_units'] == 'mmol/L':    mgdlHalfBasalTarget *= 18
+        if profile['autoISF_version']>='3.1.0' and profile['out_units']=='mmol/L' and mgdlHalfBasalTarget<30:    mgdlHalfBasalTarget *= 18
     else:
         mgdlHalfBasalTarget = 160  # // when temptarget is 160 mg/dL, run 50% basal (120 = 75%; 140 = 60%)
         # // 80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
@@ -934,8 +962,8 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             exercise_ratio = sensitivityRatio
             origin_sens = " from TT modifier"
             if gz_proto:
-                console_error("Sensitivity ratio set to "+str(sensitivityRatio)+" based on full/half/TT of "+str(fullBasalTarget)+"/"+str(halfBasalTarget)+"/"+str(target_bg)+";")
-                Flows.append(dict(title="Sensitivity ratio set to "+str(sensitivityRatio)+"\nbased on full/half/TT of "+str(fullBasalTarget)+"/"+str(halfBasalTarget)+"/"+str(target_bg), indent='1', adr='140-xx'))
+                console_error("Sensitivity ratio set to "+str(sensitivityRatio)+" based on full/half/TT of "+str(fullBasalTarget)+"/"+str(mgdlHalfBasalTarget)+"/"+str(target_bg)+";")
+                Flows.append(dict(title="Sensitivity ratio set to "+str(sensitivityRatio)+"\nbased on full/half/TT of "+str(fullBasalTarget)+"/"+str(mgdlHalfBasalTarget)+"/"+str(target_bg), indent='1', adr='140-xx'))
             else:
                 console_error("Sensitivity ratio set to "+str(sensitivityRatio)+" based on temp target of "+str(short(convert_bg(target_bg, profile))))
                 Flows.append(dict(title="Sensitivity ratio set to "+str(short(sensitivityRatio))+"\nbased on temp target of "+str(target_bg), indent='1', adr='140-xx'))
@@ -1135,7 +1163,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             Flows.append(dict(title="SMB disabled\nno enableSMB\npreferences active", indent='+1', adr='407'))
             console_error("SMB disabled (no enableSMB preferences active)")
     #console_error("-- end checking advanced SMB logic ---------")
-    sens = autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, thisTime, state, Fcasts, Flows, emulAI_ratio)
+    sens = autoISF(sens, origin_sens, target_bg, profile, glucose_status, meal_data, currentTime, autosens_data, sensitivityRatio, loop_wanted_smb, exerciseModeActive, resistanceModeActive, stepActivityDetected, stepInactivityDetected, new_parameter, thisTime, state, Fcasts, Flows, emulAI_ratio, AAPS_VersionString)
     
     #lastTempAge;
     if (typeof (iob_data['lastTemp']) != 'undefined' ):
@@ -2261,7 +2289,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             SMBInterval = SMBInterval * 60
             #//console_error(naive_eventualBG, insulinReq, worstCaseInsulinReq, durationReq);
             console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(round(lastBolusAge/60,1)))+"m ago; maxBolus:", maxBolus)
-            if (lastBolusAge > SMBInterval - 12) :     #// to be 6s tolerance but released as 12s
+            if (lastBolusAge > SMBInterval - new_parameter['SMB_interval_tolerance']) :     #// used to be 6s tolerance but emulator released as 12s
                 if (microBolus > 0) :
                     rT['units'] = microBolus
                     rT['reason'] += "Microbolusing " + str(short(microBolus)) + "U. "

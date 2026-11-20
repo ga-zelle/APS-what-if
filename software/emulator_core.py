@@ -20,6 +20,8 @@ import json
 
 import determine_basal as detSMB
 from determine_basal import my_ce_file
+#from software.emulator_batch import AAPS_VersionString
+
 #from emulator_batch import eleList
 
 # Parser debug logging (set to True to enable)
@@ -34,7 +36,8 @@ def parser_debug_log(msg: str):
         pass
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2026-03-10 22:20'       # round parabola fit minutes for aligning interactive table output
+    echo_msg['emulator_core.py'] = '2026-11-16 23:59'       # adapted for AAPS 4.0.0 format
+    #cho_msg['emulator_core.py'] = '2026-03-10 22:20'       # round parabola fit minutes for aligning interactive table output
     #cho_msg['emulator_core.py'] = '2026-01-02 12:50'       # inherit pause from AAPS in announcing carbs required
     #cho_msg['emulator_core.py'] = '2025-10-07 14:30'       # key words for Glucose Status changed in logfile
     #cho_msg['emulator_core.py'] = '2025-07-21 17:23'       # pilot drift_ISF addon
@@ -243,6 +246,7 @@ def basalFromReason(smb, lcount):
     if 'rate' in smb :
         rateReq = smb['rate']
     elif 'pump'in smb and 'extended' in smb['pump'] and 'TempBasalAbsoluteRate' in  smb['pump']['extended']:
+        #print('sub basalFrom Reason contains AAPS version:', str('Version' in smb['pump']['extended']))
         rateReq = smb['pump']['extended']['TempBasalAbsoluteRate']
     else:
         rateReq = currenttemp['rate']         # keep existing rate ?
@@ -463,6 +467,9 @@ def setVariant(stmp):
             state['Calibration'] = '"done"'
         if 'calibrationIgnore' not in profile:
             profile['calibrationIgnore']= True
+        if 'SMB_interval_tolerance' not in new_parameter:
+            new_parameter['SMB_interval_tolerance'] = 6
+
     ####################################################################################################################################
     STAIR    = {}                                                   # for general, profile like definitions
     STAIR_BAS= {}                                                   # for profile definition of basal rate
@@ -734,17 +741,30 @@ def extractResultComponent(st, key, keyStart, keyEnd):
     return Curly
 
 def TreatLoop33(st, log, lcount, fn):
-    #print('entered TreatLoop33 in line',str(lcount))
+    global iob_data
+    #print('entered TreatLoop33 in line',str(lcount), st)
     if not newLoop: return
     global utcOffset
     utcOffsetStr = extractResultComponent(st, 'utcOffset', '=', ',')
+    #print(utcOffsetStr)
     utcOffset = eval(utcOffsetStr[1:-1]+'/3600000')
-    get_currenttemp(  lcount, extractResultComponent(st, 'currentTempJson', '{', '}'))
-    get_iob_data(     lcount, extractResultComponent(st, 'iobDataJson', '[', ']'), log, st[:8] )
-    get_profile(      lcount, extractResultComponent(st, 'profileJson', '{', '}'))
-    get_autosens_data(lcount, extractResultComponent(st, 'autosensDataJson', '{', '}'))
-    get_meal_data(    lcount, extractResultComponent(st, 'mealDataJson', '{', '}'))
-    Curly = extractResultComponent(st, 'resultJson', '{', '}')
+    if AAPS_Version == '3.3':
+        get_currenttemp(  lcount, extractResultComponent(st, 'currentTempJson', '{', '}'))
+        get_iob_data(     lcount, extractResultComponent(st, 'iobDataJson', '[', ']'), log, st[:8] )
+        get_profile(      lcount, extractResultComponent(st, 'profileJson', '{', '}'))
+        get_autosens_data(lcount, extractResultComponent(st, 'autosensDataJson', '{', '}'))
+        get_meal_data(    lcount, extractResultComponent(st, 'mealDataJson', '{', '}'))
+        Curly = extractResultComponent(st, 'resultJson', '{', '}')
+        iob_data['utcOffset'] = utcOffset
+    elif AAPS_Version >= '3.3':
+        iob_data['utcOffset'] = utcOffset
+        Curly = hole(st, 20, 'suggested={', '}, iob={')[10:]
+        wo_apo = Curly.find("\'")
+        if wo_apo > 0:
+            Curly = Curly[:wo_apo - 1] + Curly[wo_apo:]
+        #print('Curly_suggest in row', str(lcount), Curly)
+        pass
+
     rt = json.loads(Curly)
     global SMBreason, origAI_ratio
     SMBreason = {}                                              # clear for first filtered debug list
@@ -807,7 +827,7 @@ def TreatLoop(Curly, log, lcount, fn):
     global origMaxBolus, emulMaxBolus
     global origBasal, lastBasal
     global longDelta, avgDelta, longSlope, rateSlope, corrSlope, glucose_status, origISF, BZ_ISF, Delta_BZ, emulISF, origAI_ratio, emulAI_ratio
-    global Pred, FlowChart, Fits
+    global Pred, FlowChart, Fits, AAPS_VersionString
     global  CarbReqGram, CarbReqTime, lastCOB
     #print('\nentered TreatLoop for row '+str(lcount)+' ending with  /'+Curly[-1]+'/ having '+Curly[780:800]+'\n'+Curly)
     wo_apo = Curly.find("\'")
@@ -821,7 +841,7 @@ def TreatLoop(Curly, log, lcount, fn):
     #print('zeile', str(lcount), '\n'+(Curly))
     smb = json.loads(Curly)
 
-    go_on = False
+    go_on = AAPS_Version=='4.0'
     if 'openaps' in smb and 'reason' in smb['openaps']['suggested']:# otherwise unknown source of entry
         suggest = smb['openaps']['suggested']
         go_on = True
@@ -998,8 +1018,10 @@ def TreatLoop(Curly, log, lcount, fn):
         else:
             msgFile = 'Scanning logfile '+fn       
         log_msg(msgFile + ',  loop time stamp '+stmp,'\r')
-        reT = detSMB.determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, MicroBolusAllowed, reservoir, thisTime, Fcasts, Flows, emulAI_ratio)
-        #newLoop = False
+        AAPS_VersionString = 'unknown'
+        reT = detSMB.determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_data, meal_data, tempBasalFunctionsDummy, MicroBolusAllowed, reservoir, thisTime, Fcasts, Flows, emulAI_ratio, AAPS_VersionString)
+        #print("version after DetermineBasal:", AAPS_VersionString)
+        #newLoop = False)
         if len(origAI_ratio)<len(emulAI_ratio):
             origAI_ratio.append(10.0)                   # not found in original console_error
         reason = echo_rT(reT)                           # overwrite the original reason
@@ -1094,7 +1116,7 @@ def PrepareSMB(zeile, log, lcount):
     pass
 
 def featured(Option):
-    # check whethter this feature was in the option list passed from OO.odb
+    # check whether this feature was in the option list passed from OO.odb
     # or if ALL option were enabled
     # otherwise FALSE
     OK = 'All' in doit  or Option in doit
@@ -1189,23 +1211,21 @@ def get_glucose_status(lcount, st) :                    # key = 80
     #    #print ('\nbg data found in row '+str(lcount)+', total count='+str(len(bg)))
     #    if mills>=1684843012 and mills<=1684843013:
     #        print('deltas at '+str(mills), str(deltas[mills]))
+    #print('', str(lcount), 'glucose_status:', str(glucose_status))
     pass
 
 def getSpecialDeltas(Curly):
     global deltaStatus
     if Curly[-1:] != '}':       Curly += '}'            # incomplete during 7.Jun.2925
     deltaStatus = json.loads(Curly)
-    #for ele in dJson:
-    #    deltaStatus[ele] = dJson[ele]
-    #print(str(deltaStatus))
     pass
 
-def get_iob_data(lcount, st, log, stampStr) :           # key = 81
+def get_iob_data(lcount, st, log, stampStr) :    # key = 81
     if not newLoop: return
     global iob_data, utcOffset
     global activity
     global AAPS_Version
-    if AAPS_Version != '3.3' and st.find('netbasalinsulin')>0:
+    if AAPS_Version != '3.3' and AAPS_Version != '4.0' and st.find('netbasalinsulin')>0:
         AAPS_Version = '3.3'    # missed other sings
         return                  # wait for DATABASE RECORD
     if AAPS_Version == '3.3':     
@@ -1265,8 +1285,9 @@ def get_iob_data(lcount, st, log, stampStr) :           # key = 81
             else:
                 activity[-1] = (act*1000)
         elif ele == 'time':
-            if AAPS_Version != '3.3':
-                #print('\niob time: '+ rec_0[ele][11:19], ' loop time:'+ stampStr)
+            if AAPS_Version < '3.3':
+                #print('\niob time: ' + rec_0[ele][11:19], ' loop time:' + stampStr)
+                #print('\n'+AAPS_Version, 'iob time: ' + str(rec_0[ele]), ' loop time:' + stampStr)
                 hourOffset = eval('1' + stampStr[0:2]+ '-1' + rec_0[ele][11:13])
                 minuteOffset = eval('1' + stampStr[3:5] + '-1' + rec_0[ele][14:16])
                 utcOffset = round(hourOffset + minuteOffset/60, 0)
@@ -1276,14 +1297,15 @@ def get_iob_data(lcount, st, log, stampStr) :           # key = 81
                 #print('in get_iob_data', str(type('utcOffset')))
                 pass
     iob_data['iobArray']= iob_array
-    iob_data['utcOffset'] = utcOffset
+    if AAPS_Version < '3.3':    iob_data['utcOffset'] = utcOffset
     #print ('preliminary iob data json -->       '+str(lcount) +' : '+ str(iob_data))
     #for ele in iob_array:
     #    log.write(str(ele)+':'+'\n')
-    #print ('iob data found in row '+str(lcount)+', total count='+str(len(iob_data)), str(len(origiob)))
+    #print ('', str(lcount), 'iob data :'+str(iob_data))
     pass
 
 def get_currenttemp(lcount, st) :                       # key = 82
+    #print('entered get_currenttemp found in row', str(lcount))
     if not newLoop: return
     if AAPS_Version == '3.3':  
         Curly = st
@@ -1309,7 +1331,7 @@ def get_currenttemp(lcount, st) :                       # key = 82
     currenttemp = json.loads(Curly)
     currenttemp["typeof"] ="dummy"                      # may be anything
     currenttemp["row"] = lcount
-    #print ('currenttemp json -->    '+str(currenttemp))
+    #print ('', str(lcount), 'currenttemp:', str(currenttemp))
     pass
 
 def getCalibrationJson(Curly, lcount):
@@ -1324,19 +1346,24 @@ def getCalibrationJson(Curly, lcount):
     pass
     
 def get_profile(lcount, st) :                           # key = 83
-    global newLoop
+    global newLoop, AAPS_VersionString
     if not newLoop : return
-    #print(AAPS_Version, st)
-    if AAPS_Version == '3.3':
-        Curly = st
+    if 'AAPS_VersionString' not in locals() and 'AAPS_VersionString' not in globals():   AAPS_VersionString = 'unknown'
+    #print(AAPS_Version, AAPS_VersionString, st)
+    if AAPS_Version >= '3.3':
         #print(activityMonitorCurly)
         am_json = json.loads(activityMonitorCurly)
     else:
-        am_json= {}     # nothing from activity monitor separate json
+        am_json = {}  # nothing from activity monitor separate json
+    if AAPS_Version == '3.3' and AAPS_VersionString < '4.0.0':
+        Curly = st
+    else:
         key = 'OapsProfileAutoIsf'
         wo = st.find(key)
         if wo>0:        # APS3.3-dev format
             Curly= st[wo+len(key):]
+        elif st[0] == '{':
+            Curly = st
         else:
             Curly = st[16:]
     global profile, profISF
@@ -1348,11 +1375,17 @@ def get_profile(lcount, st) :                           # key = 83
         Curly = Curly.replace(' ', '"')
         Curly = Curly.replace('out_units":', 'out_units":"')
         Curly = Curly.replace('mmol/L,', 'mmol/L",')
-        Curly = Curly.replace('"autoISF_version":,', '"autoISF_version":"",')       # other mode or plugin
+        #Curly = Curly.replace('"autoISF_version":,', '"autoISF_version":",')       # other mode or plugin
+        wo_anf = Curly.find('autoISF_version":')
+        wo_length = len('autoISF_version":')
+        wo_end = Curly[wo_anf:].find(',') + wo_anf #+ wo_length
+        versionStr = Curly[wo_anf+wo_length:wo_end]
+        #print('version string was:', versionStr, 'from position', str(wo_anf+wo_length), 'bis', str(wo_end))
+        Curly = Curly.replace(versionStr, '"'+versionStr+'"')
         Curly = Curly.replace('dl,"lgsThreshold', 'dl","lgsThreshold')
         Curly = '{' + Curly + '}'
         #print('\nnachher:', Curly)
-        #print('char 5:', Curly[.10])  #, str(chr(Curly[948])))
+        #print('Profile Curly close to problem:', Curly[1270:1290])  #, str(chr(Curly[948])))
     profile = json.loads(Curly)
     for ele in am_json:
             profile[ele] = am_json[ele]
@@ -1383,7 +1416,7 @@ def get_profile(lcount, st) :                           # key = 83
         origTarHig[-1] = profile['max_bg']
         emulTarHig[-1] = origTarHig[-1]
         profISF[-1]    = profile['sens']
-    #print ('master profile json in row '+str(lcount)+' --> '+str(profile))
+    #print ('', str(lcount), 'profile:', str(profile))
     #print ('target data found in row '+str(lcount)+', total count loop/origTarLow='+str(len(loop_mills))+'/'+str(len(origTarLow)))
     #print ('target data', str(origTarLow), 'found in row '+str(lcount)+', total count emulTarLow='+str(len(origTarLow)))
     pass
@@ -1416,7 +1449,7 @@ def get_meal_data(lcount, st) :                         # key = 84
     if 'carbs' not in meal_data:                        meal_data['carbs'] = 0
     if 'slopeFromMinDeviation' not in meal_data:        meal_data['slopeFromMinDeviation'] = 999
     if 'slopeFromMaxDeviation' not in meal_data:        meal_data['slopeFromMaxDeviation'] = 0
-    #print ('meal data json -->      '+str(meal_data))
+    #print ('', str(lcount), 'meal:', str(meal_data))
     pass
 
 def get_autoISF_extras(lcount, Curly):
@@ -1477,18 +1510,21 @@ def get_autosens_data(lcount, st) :                     # key = 86
     else:
         origAs_ratio[-1] = (autosens_data['ratio']*10)
         autoISF[-1] = (profile['sens'] / autosens_data['ratio'])    # ISF assigned now as autosense is the last data block
+    #print( ... '', str(lcount), 'autosense_data:', str(autosens_data))
     pass
 
 def get_AutoIsfMode(lcount, st) :
     if not newLoop: return
     global AutoIsfMode
     AutoIsfMode = (st.find('true') > 16)
+    #print('', str(lcount), 'AutoIsfMode:', str(AutoIsfMode))
     pass
 
 def get_flatBGsDetected(lcount, st) :
     if not newLoop: return
     global flatBGsDetected
     flatBGsDetected = (st.find('true') > 16)
+    #print('', str(lcount), 'flatBGsDetected:', str(flatBGsDetected))
     pass
 
 def get_MicroBolusAllowed(lcount, st) :                 # key = 90
@@ -1496,7 +1532,14 @@ def get_MicroBolusAllowed(lcount, st) :                 # key = 90
     global MicroBolusAllowed
     #Curly = st[16:]
     MicroBolusAllowed = (st.find('true') > 16)
+    #print('', str(lcount), 'MircobolusAllowed:', str(MicroBolusAllowed))
     pass
+
+def getAAPSVersion(zeile, lcount):
+    Curly = hole(zeile, 100, '"extended":{', '}')[11:]
+    versionJson = json.loads(Curly)
+    #print("got version string:", str(lcount), versionJson['Version'], Curly)
+    return versionJson['Version']
 
 def ConvertSTRINGooDate(stmp: str) -> int:
     """
@@ -1538,7 +1581,7 @@ def scanLogfile(fn, entries):
     global log
     global varlog
     global newLoop, activityMonitorCurly
-    global dataType_offset, AAPS_Version
+    global dataType_offset, AAPS_Version, AAPS_VersionString
     global CarbReqGram,  CarbReqTime, lastCOB
     
     if not newLoop:                             # otherwise continued from provious logfile
@@ -1638,12 +1681,14 @@ def scanLogfile(fn, entries):
                     if Block2 == '[DataService.onHandleIntent():54]' \
                     or Block2 == '[DataService.onHandleIntent():55]' \
                     or Block2 == '[DataService.onHandleIntent():69]':               # token :54 added for AAPS versions <2.7, :69 for V2.7
+                        #TODO: extract AAPS version string for older versions like 2.3
                         pass
                     elif Block2[:-3] == '[DetermineBasalAdapterAMAJS.invoke():':                                                   # various input items for loop
                         log_msg('\nSorry, this tool is currently only available for oref1 with SMB\n')
                         return 'STOP'
                     elif re.match(r"\[DetermineBasalAdapter[A-Za-z]+\.invoke\(\)", Block2) \
                       or re.match(r"\[OpenAPSAutoISFPlugin\.invoke\(\)", Block2) \
+                      or re.match(r"\[OpenAPSAutoISFPlugin\$invoke\$2\.invokeSuspend\(\):", Block2) \
                       or re.match(r"\[OpenAPSSMBPlugin.invoke\(\)", Block2):  # loop inputs or result record
                         key_anf = Block2.find('):')
                         key_end = Block2.find(']:')
@@ -1671,8 +1716,15 @@ def scanLogfile(fn, entries):
                             #elif dataType == 110:   pass                    # V 2 7:     CurrentTime: 1604776609511
                             #elif dataType != 163:   print('unhandled dataType:', str(dataType), 'row', str(lcount), 'of file',fn) # any but 2.7 RESULT
                             #version_set = True                              # keep until next logfile is loaded
+                            #print(str(lcount), dataStr, str(dataType))
                             pass
-                        if Block2.find('AutoISF')>0:                         AAPS_Version = '3.3'    # during dev only?
+                        #print('code row 1697', AAPS_Version)
+                        #if 'AAPS_VersionString' in locals() or 'AAPS_VersionString' in globals():
+                            #print('code in row 1699', AAPS_VersionString)
+                        if Block2.find('AutoISF') > 0:                                                  AAPS_Version = '3.3'  # during dev only?
+                        if Block2.find('[OpenAPSAutoISFPlugin$invoke$2.invokeSuspend():4') == 0:        AAPS_Version = '4.0'    # during dev only?
+                        #print('code row 1702', AAPS_Version)
+
                         if   dataTxt[:16] == 'RhinoException: ' :           code_error(lcount, dataStr)
                         elif dataTxt[:16] == 'Glucose status: ' :           get_glucose_status(lcount, dataStr)
                         elif dataTxt[:16] == 'IOB data:       ' and AAPS_Version!='3.3':     get_iob_data(lcount, dataStr, log, zeile[:8])
@@ -1683,7 +1735,7 @@ def scanLogfile(fn, entries):
                         elif dataTxt      == 'AutoIsfMode:     ' :          get_AutoIsfMode(lcount, dataStr)
                         elif dataTxt      == 'flatBGsDetected: ' :          get_flatBGsDetected(lcount, dataStr)
                         elif dataTxt      == 'MicroBolusAllowed' :          get_MicroBolusAllowed(lcount, dataStr)
-                        #elif dataTxt     == 'Result: RT(algori' :          cont = TreatLooop33(dataStr, log, lcount, fn)
+                        #lif dataTxt[:16] == 'Result: RT(algor' and AAPS_Version=='4.0':     cont = TreatLoop(dataStr[8:], log, lcount, fn)
                         elif dataTxt[:16] == 'AutoISF extras: ' :           get_autoISF_extras(lcount, hole(sLine, 1+sOffset+len(Block2), '{', '}'))
                         elif dataTxt      == 'Result: {"temp":"' :
                                                                             checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.6.1
@@ -1693,7 +1745,7 @@ def scanLogfile(fn, entries):
                         #elif dataType == dataType_offset+147:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 Wolfgang Spänle
                         #elif dataType == dataType_offset+146:               checkCarbsNeeded(dataStr[8:], lcount)   # result record in AAPS2.8 / Phillip
                         #else:   print('unknown', dataTxt)
-                        #else:   print (str(lcount), str(dataType), str(dataType_offset), '/'+dataTxt+'/' + dataStr[17:60])
+                        else:   pass    #print ('skipped', str(lcount), str(dataType), str(dataType_offset), '/'+dataTxt+'/' + dataStr[17:60])
                         pass
                     elif Block2 == '[LoggerCallback.jsFunction_log():39]' \
                     or   Block2 == '[LoggerCallback.jsFunction_log():42]' \
@@ -1716,9 +1768,33 @@ def scanLogfile(fn, entries):
                             if cont=='STOP' or cont=='SYNTAX':     return cont
                     elif zeile.find('Activity Monitor json:') > 0 :
                         activityMonitorCurly = hole(zeile, 20, '{', '}')
+                    elif zeile.find('[PersistenceLayerImpl.insertDeviceStatus():') > 0:
+                        AAPS_VersionString = getAAPSVersion(zeile,lcount)
+                        if AAPS_Version == '4.0':
+                                                                            #print('found result in row', str(lcount))
+                                                                            cont = TreatLoop33(zeile, log, lcount, fn)
+                                                                            if cont == 'STOP' or cont == 'SYNTAX':    return cont
+
                     elif zeile.find('[PersistenceLayerImpl$insertOrUpdateApsResult$2.apply():') > 0:
+                                                                            #print('found result in row', str(lcount))
                                                                             cont = TreatLoop33(zeile, log, lcount,fn)
                                                                             if cont=='STOP' or cont=='SYNTAX':     return cont
+                    #elif zeile.find('[OpenAPSAutoISFPlugin$invoke$2.invokeSuspend():') > 0:
+                        #dataStr = sLine[zeile.find(']: ')+3:]
+                        #if   dataStr.find('Glucose status:')>0:     get_glucose_status(lcount, dataStr)
+                        #elif dataStr.find('IOB data:')>0:           get_iob_data(lcount, dataStr, log, zeile[:8])
+                        #elif dataStr.find('Current temp:')>0:       get_currenttemp(lcount, dataStr)
+                        #elif dataStr.find('Profile:')>0:            get_profile(lcount, dataStr)
+                        #elif dataStr.find('Meal data:')>0:          get_meal_data(lcount, dataStr)
+                        #elif dataStr.find('Autosens data')>0:       get_autosens_data(lcount, dataStr)
+                        #elif dataStr.find('AutoIsfMode:')>0:        get_AutoIsfMode(lcount, dataStr)
+                        #elif dataStr.find('flatBGsDetected:')>0:    get_flatBGsDetected(lcount, dataStr)
+                        #elif dataStr.find('MicroBolusAllowed')>0:   get_MicroBolusAllowed(lcount, dataStr)
+                        #elif dataStr.find('Result: RT(')>0:
+                                                                    #checkCarbsNeeded(dataStr[8:], lcount)  # result record in AAPS2.6.1
+                                                                    #cont = TreatLoop(dataStr[8:], log, lcount, fn)
+                                                                    #if cont == 'STOP' or cont == 'SYNTAX':     return cont
+                        #else:                                       print('no branching found for key', dataStr)
                     elif zeile.find(']: State json') > 0 :
                         Curly = hole(sLine, 1+sOffset+len(Block2), '{', '}')
                         getStateValue(Curly)
@@ -1727,7 +1803,7 @@ def scanLogfile(fn, entries):
                     elif zeile.find(']: CarbSuggestion disabled until ') > 0:
                         pauseCarbsReq(zeile[zeile.find('until ') + 6:], lcount)
                     elif zeile.find(']: detailedDelta json') >0 :
-                        getSpecialDeltas(zeile[zeile.find('{'):])
+                        getSpecialDeltas(hole(zeile, 20, '{', '}'))
                     #elif lcount>1400 and lcount<2000:   print('no match in row'+str(lcount)+':', Block2)
                 elif zeile.find('data:{"device":"openaps:') == 0 :                      ################## flag for V2.6.1 ff
                     Curly =  hole(zeile, 5, '{', '}')
@@ -1784,7 +1860,7 @@ def echo_rT(reT):                                       # echo the unusual SMB r
     elif 'reason' in reT:                               # normal finish
         reason = reT['reason']
         log.write('---------- Reason --------------------------\n' + str(reason) + '\n')
-        if not 'insulinReq' in reT:     reT['insulinReq'] = 0       # case of Dexcon CGM error
+        if not 'insulinReq' in reT:     reT['insulinReq'] = 0       # case of Dexcom CGM error
         emulInsReq.append(reT['insulinReq'])
         tempReq = basalFromEmulation(reT, lcount)
         emulBasal.append(eval(tempReq))
@@ -1932,7 +2008,7 @@ def getBestParabolaBG(iFrame):
     if 'FSL_min_dur' in new_parameter:
         FSL_min_dur = new_parameter['FSL_min_dur']
     else:
-        FSL_min_dur = 10                    # duration must be longer if BG measured by the minute
+        FSL_min_dur = 15                    # default; should be adapted to the CGM mode:1min->10.0; 5min->15.0
     if iFrame<3 or bgTime[iFrame]-bgTime[0] <= FSL_min_dur*60:  return 0,0, {}, -1    # first 3 points make a trivial parabola
     
     corrMin = 0.90                          # go backwards until the correlation coefficient goes below
@@ -2045,6 +2121,7 @@ def getBgTimeIndex(iFrame):
     return bgIndex
 
 def XYplots(loopCount, head1, head2, entries) :
+    if not featured('PDF'):      return
     import matplotlib.pyplot as plt
     from matplotlib.animation import FFMpegWriter
     from matplotlib.backends.backend_pdf import PdfPages
@@ -2574,14 +2651,14 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
     global  Pred, FlowChart, Fits
     global  filecount
     global  t_startLabel, t_stoppLabel
-    global  varFile
+    global  varFile, AAPS_VersionString
     global  CarbReqGram, CarbReqTime, lastCOB, pauseCarbsReqEnds
     
     global  isAndroid                               # flag for running on Android
     global  isZip                                   # flag for input file type
     global  newLoop                                 # flag whether data collection for new loop started
     #global  entries
-    global   deltas, linFit, cubFit, new_parameter
+    global   deltas, linFit, cubFit, new_parameter, deltaStatus
 
     deltas      = {}
     linFit      = {}
@@ -2771,7 +2848,9 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 #    print('defaulting Carbs Req pause', str(pauseCarbsReqEnds))
                 pass
             cont = scanLogfile(fn, entries)
-            #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
+            #print('returned AAPS_VersionString from ScanLogfile', AAPS_VersionString)
+            # print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
+
             filecount += 1
             if cont == 'SYNTAX':
                 varlog.close()
@@ -3034,8 +3113,8 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         #print(str(pro))
         delta_file = wd + fnLabel + '.' + varLabel + '.delta'
         delta = open(delta_file, 'w')
-        delta.write('   time        time    [mg/dl]   5min    other-deltas    linear-fit    -----orig parabola fit-----    emul.par.fit\n' \
-                  + '    UTC        UNIX       bg     delta  short    long    dura slope     corr  dura  last-Δ  next-Δ    dura  next-Δ\n')
+        delta.write('   time        time    [mg/dl]   5min    other-deltas    linear-fit    -----orig parabola fit-----    emul.par.fit   ---smoothed deltas--\n' \
+                  + '    UTC        UNIX       bg     delta  short    long    dura slope     corr  dura  last-Δ  next-Δ    dura  next-Δ   delta  short    long\n')
         i = 0
         for mills in deltas:
             #mills = loop_mills[i]
@@ -3050,8 +3129,13 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 ll += 31 * ' '
             dura_p, delta_p, parabs, iMax = getBestParabolaBG(i)
             ll += f'{round(dura_p,1):>8}{round(delta_p,2):>7}'
-            if iMax >=0:    ll += '  '+str(parabs[iMax]) 
-            delta.write(ll.replace('.', my_decimal) + '\n')
+            if iMax >=0:
+                ll += '  '+str(parabs[iMax])
+                try:
+                    ll += '  '+str(deltaStatus)
+                except:
+                    pass
+            delta.write(ll.replace(':', '§') + '\n')
             i += 1
             if i >= len(loop_label):        break
         delta.close()

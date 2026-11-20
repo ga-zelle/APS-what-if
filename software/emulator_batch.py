@@ -12,9 +12,10 @@ from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
 
 def get_version_batch(echo_msg):
-    echo_msg['emulator_batch.py'] = '2025-12-28 16:30'      # pause in announcing carbs required
+    echo_msg['emulator_batch.py'] = '2026-11-05 13:54'      # announce SMB diff only when <-0.1 or >0.1 which are rounding effects
+    #cho_msg['emulator_batch.py'] = '2025-12-28 16:30'      # pause in announcing carbs required
     #cho_msg['emulator_batch.py'] = '2025-05-27 14:00'      # fit table output for Qpython+; adapt VDF home
-    #cho_msg['emulator_batch.py'] = '2025-04-09 03:18'      # Logdir geändert
+    #cho_msg['emulator_batch.py'] = '2025-04-09 03:18'      # Logdir changed
     return echo_msg
 
 if sys.platform == "linux":
@@ -430,6 +431,9 @@ entries = {}
 lastTime = '0'
 pauseCarbsReqEnds = datetime(1970, 1, 1, 0, 0, 0)
 
+global  AAPS_VersionString
+AAPS_VersionString = ''
+
 while wdhl[0]=='y':                                                                 # use CANCEL to stop/exit
     # All command line arguments known, go for main process
     loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first, pauseCarbsReqEnds = parameters_known(myseek, arg2, varFile, t_startLabel, t_stoppLabel, entries, m, my_decimal, pauseCarbsReqEnds)
@@ -459,11 +463,11 @@ while wdhl[0]=='y':                                                             
                 #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, carb_ansage0])
                 #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, both_ansage1 + str(valGram) + carb_ansage2 + AlarmTime + carb_ansage3])
         #print("extra bolus", str(thisInt in pickMoreSMB), str(extraSMB))
-        if (thisInt in pickMoreSMB) and extraSMB>0 and thisTime>lastTime:
+        if (thisInt in pickMoreSMB) and extraSMB>0.1 and thisTime>lastTime:
             droid.ttsSpeak(textNewSettings+varFile[len(vdf_dir):-4]+textMoreSMB+str(extraSMB)+textUnit)
             #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, textMoreSMB+str(extraSMB)+textUnit])    # wake up user, also during sleep?
         #print("less  bolus", str(thisInt in pickLessSMB), str(extraSMB))
-        if (thisInt in pickLessSMB) and extraSMB<0 and thisTime>lastTime:
+        if (thisInt in pickLessSMB) and extraSMB<-0.1 and thisTime>lastTime:
             droid.ttsSpeak(textNewSettings+varFile[len(vdf_dir):-4]+textLessSMB+str(extraSMB)+textUnit)
             #call(['espeak', '-v',language[languageID], '-p',pitch, '-s',speed, textLessSMB+str(extraSMB)+textUnit])    # wake up user, also during sleep?
         howLong = waitNextLoop(loopInterval, thisTime, varFile[len(vdf_dir):-4])
